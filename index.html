@@ -37,7 +37,7 @@
     <input id="pageInput" class="main-input" type="text" placeholder="destination..." spellcheck="false">
     <br>
     <button class="launch-btn" onclick="openSession();">Open Popup</button>
-    <div class="status" id="statusMsg">If popup is blocked, check your browser address bar.</div>
+    <div class="status" id="statusMsg">If popup is blocked, check your address bar.</div>
   </div>
 
   <script>
@@ -45,24 +45,17 @@
       const input = document.getElementById('pageInput');
       let url = input.value.trim();
       
-      // Validation
-      if (!url) {
-          input.style.borderColor = "#f00";
-          return;
-      }
+      if (!url) { input.style.borderColor = "#f00"; return; }
       if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
 
-      // The Popup Setup
-      // We open 'about:blank' first to ensure the browser allows the window
       const popup = window.open('about:blank', 'CosmosSession', 'width=1280,height=720');
 
       if (!popup || popup.closed || typeof popup.closed == 'undefined') {
-          document.getElementById('statusMsg').innerText = "❌ Popup Blocked! Please allow popups for this site.";
+          document.getElementById('statusMsg').innerText = "❌ Popup Blocked! Enable popups in the browser settings.";
           document.getElementById('statusMsg').style.color = "#f55";
           return;
       }
 
-      // Inject the code into the new popup window
       popup.document.write(`
         <!DOCTYPE html>
         <html>
@@ -73,33 +66,53 @@
             body, html { margin:0; padding:0; height:100%; overflow:hidden; background:#000; font-family:'Comfortaa', cursive; color:white; }
             iframe { width:100%; height:100%; border:none; background:#fff; }
             
-            #ghostTrigger { position:fixed; top:15px; right:15px; width:40px; height:40px; background:rgba(255,255,255,0.05); border-radius:12px; z-index:100; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.3s; opacity:0.4; }
-            #ghostTrigger:hover { opacity:1; background:rgba(255,255,255,0.1); }
+            /* TRIGGER ALWAYS ON TOP */
+            #ghostTrigger { 
+                position:fixed; top:15px; right:15px; width:40px; height:40px; 
+                background:rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1);
+                border-radius:12px; z-index:10005; cursor:pointer; 
+                display:flex; align-items:center; justify-content:center; 
+                transition:0.3s; opacity:0.6; 
+            }
+            #ghostTrigger:hover { opacity:1; background:rgba(255,255,255,0.2); transform: scale(1.1); }
             .dot { width:4px; height:4px; background:#fff; border-radius:50%; margin:0 1px; }
 
-            #panel { position:fixed; top:20px; right:-350px; width:300px; height:calc(100% - 40px); background:rgba(10,10,10,0.98); border:1px solid rgba(255,255,255,0.1); border-radius:30px; transition:0.5s cubic-bezier(0.16,1,0.3,1); z-index:101; backdrop-filter:blur(20px); padding:25px; box-sizing:border-box; display:flex; flex-direction:column; }
-            #panel.open { transform: translateX(-370px); }
+            #panel { 
+                position:fixed; top:20px; right:-380px; width:300px; 
+                height:calc(100% - 40px); background:rgba(10,10,10,0.98); 
+                border:1px solid rgba(255,255,255,0.1); border-radius:30px; 
+                transition:0.6s cubic-bezier(0.16,1,0.3,1); z-index:10001; 
+                backdrop-filter:blur(25px); padding:25px; box-sizing:border-box; 
+                display:flex; flex-direction:column; box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+            }
+            #panel.open { transform: translateX(-400px); }
             
             input { background:#151515; border:1px solid #222; color:#fff; padding:12px 20px; border-radius:100px; outline:none; font-family:inherit; width:100%; box-sizing:border-box; margin-bottom:10px; }
             .btn { padding:12px; background:#1a1a1a; color:#fff; border:none; border-radius:100px; cursor:pointer; font-weight:700; font-family:inherit; width:100%; margin-bottom:10px; transition:0.2s; }
             .btn:hover { background:#fff; color:#000; }
-            .label { font-size:0.7rem; color:#444; text-transform:uppercase; margin:10px 0 5px 10px; }
+            .label { font-size:0.7rem; color:#444; text-transform:uppercase; margin:10px 0 5px 10px; letter-spacing: 1px; }
           </style>
         </head>
         <body>
           <div id="ghostTrigger" onclick="t()">
-            <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+            <div class="dot"></div><div class="dot)</div><div class="dot"></div>
           </div>
 
           <div id="panel">
-            <div style="font-weight:700; margin-bottom:20px;">Cosmos</div>
+            <div style="font-weight:700; font-size:1.2rem; margin-bottom:20px;">Cosmos</div>
+            
             <input id="n" type="text" value="${url}">
             <button class="btn" onclick="g()">Navigate</button>
             <button class="btn" onclick="r()">Reload</button>
+            
             <div class="label">Quick Links</div>
             <button class="btn" onclick="q('https://web.cloudmoonapp.com/')">CloudMoon</button>
+            
+            <div class="label">Settings</div>
+            <button id="fixBtn" class="btn" onclick="toggleFix()">CloudMoon Fix: ON</button>
+
             <div style="margin-top:auto;">
-               <button class="btn" style="background:#200; color:#f55;" onclick="window.close()">Close Session</button>
+               <button class="btn" style="background:#200; color:#f55; border: 1px solid #411;" onclick="window.close()">Close Session</button>
             </div>
           </div>
 
@@ -109,15 +122,38 @@
             const f = document.getElementById('f');
             const p = document.getElementById('panel');
             const n = document.getElementById('n');
+            const fixBtn = document.getElementById('fixBtn');
+
+            let fixEnabled = true;
 
             function t() { p.classList.toggle('open'); }
+            
             function g() { 
                 let u = n.value; 
                 if(!/^https?:\\/\\//i.test(u)) u = 'https://' + u;
                 f.src = u; t(); 
             }
-            function r() { const c = f.src; f.src = 'about:blank'; setTimeout(() => {f.src = c}, 50); t(); }
+            
+            function r() { 
+                const c = f.src; 
+                f.src = 'about:blank'; 
+                setTimeout(() => { f.src = c; }, 50); 
+                if(p.classList.contains('open')) t(); 
+            }
+            
             function q(u) { f.src = u; n.value = u; t(); }
+
+            function toggleFix() {
+                fixEnabled = !fixEnabled;
+                if (fixEnabled) {
+                    f.setAttribute('sandbox', 'allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox');
+                    fixBtn.innerText = "CloudMoon Fix: ON";
+                } else {
+                    f.setAttribute('sandbox', 'allow-forms allow-scripts allow-same-origin');
+                    fixBtn.innerText = "CloudMoon Fix: OFF";
+                }
+                r(); // Reload frame to apply new sandbox rules
+            }
             
             n.addEventListener('keypress', (e) => { if(e.key === 'Enter') g(); });
           <\/script>
@@ -127,7 +163,6 @@
       popup.document.close();
     }
 
-    // Enter Key Support for main page
     document.getElementById('pageInput').addEventListener('keypress', (e) => { 
         if (e.key === 'Enter') openSession(); 
     });
