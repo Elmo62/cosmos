@@ -69,10 +69,16 @@
             }
             #panel.open { transform: translateX(-400px); }
 
-            #tab-list { margin: 15px 0; max-height: 200px; overflow-y: auto; }
-            .tab-item { background: #151515; padding: 10px 15px; border-radius: 10px; margin-bottom: 5px; cursor: pointer; display: flex; justify-content: space-between; font-size: 0.8rem; border: 1px solid #222; }
-            .tab-item.active { border-color: #fff; background: #222; }
-            .tab-item:hover { background: #222; }
+            #tab-list { margin: 15px 0; max-height: 400px; overflow-y: auto; }
+            .tab-item { 
+                background: #111; padding: 12px 15px; border-radius: 12px; margin-bottom: 8px; 
+                cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+                font-size: 0.75rem; border: 1px solid #222; transition: 0.2s;
+            }
+            .tab-item.active { border-color: #555; background: #1a1a1a; }
+            .tab-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+            .close-x { color: #555; font-weight: bold; padding: 0 5px; }
+            .close-x:hover { color: #f55; }
 
             input { background:#151515; border:1px solid #222; color:#fff; padding:12px 20px; border-radius:100px; outline:none; width:100%; box-sizing:border-box; margin-bottom:10px; }
             .btn { padding:12px; background:#1a1a1a; color:#fff; border:none; border-radius:100px; cursor:pointer; font-weight:700; width:100%; margin-bottom:10px; }
@@ -90,17 +96,20 @@
           </div>
 
           <div id="debugBtn" onclick="toggleDbg()"></div>
-          <div id="debugOverlay" id="dbg">
+          <div id="debugOverlay">
             <b>COSMOS_DEBUG</b><br>
             TABS: <span id="d-tabs">0</span><br>
-            ACTIVE_SBX: <span id="d-sbx">NONE</span>
+            SBX: <span id="d-sbx">NONE</span>
           </div>
 
           <div id="panel">
             <div style="font-weight:700; font-size:1.5rem; margin-bottom:20px;">Cosmos</div>
             
-            <input id="n" type="text" placeholder="Enter URL...">
+            <input id="n" type="text" placeholder="destination...">
             <button class="btn" onclick="addTab()">+ New Tab</button>
+
+            <div class="label">Quick Links</div>
+            <button class="btn" onclick="addTab('https://web.cloudmoonapp.com/')">CloudMoon</button>
 
             <div class="label">Open Tabs</div>
             <div id="tab-list"></div>
@@ -127,6 +136,13 @@
 
             function t() { document.getElementById('panel').classList.toggle('open'); }
 
+            function getFriendlyName(url) {
+                try {
+                    let name = url.replace(/^https?:\\/\\//i, '').split('/')[0];
+                    return name.charAt(0).toUpperCase() + name.slice(1);
+                } catch(e) { return "New Tab"; }
+            }
+
             function addTab(url = n.value) {
                 if(!url) return;
                 if(!/^https?:\\/\\//i.test(url)) url = 'https://' + url;
@@ -136,17 +152,25 @@
                 ifr.id = id;
                 ifr.src = url;
                 
-                // Set initial sandbox based on Fix State
                 updateFrameSandbox(ifr);
 
+                ifr.onload = () => {
+                    // Update tab name based on URL after loading
+                    const index = tabs.findIndex(t => t.id === id);
+                    if (index !== -1) {
+                        tabs[index].name = getFriendlyName(ifr.src);
+                        renderTabs();
+                    }
+                };
+
                 container.appendChild(ifr);
-                tabs.push({ id, url });
+                tabs.push({ id, url, name: getFriendlyName(url) });
                 n.value = '';
                 switchTab(tabs.length - 1);
-                if(document.getElementById('panel').classList.contains('open')) t();
             }
 
             function switchTab(index) {
+                if (index < 0) return;
                 activeIndex = index;
                 const allIframes = container.querySelectorAll('iframe');
                 allIframes.forEach((f, i) => {
@@ -161,10 +185,15 @@
                 const tab = tabs[index];
                 document.getElementById(tab.id).remove();
                 tabs.splice(index, 1);
-                if(activeIndex >= tabs.length) activeIndex = tabs.length - 1;
-                if(tabs.length === 0) activeIndex = -1;
+                
+                if (tabs.length === 0) {
+                    activeIndex = -1;
+                } else if (activeIndex >= index) {
+                    activeIndex = Math.max(0, activeIndex - 1);
+                }
+                
                 renderTabs();
-                switchTab(activeIndex);
+                if (activeIndex !== -1) switchTab(activeIndex);
             }
 
             function renderTabs() {
@@ -172,7 +201,7 @@
                 tabs.forEach((tab, i) => {
                     const item = document.createElement('div');
                     item.className = 'tab-item' + (i === activeIndex ? ' active' : '');
-                    item.innerHTML = \`<span>Tab \${i+1}</span><span onclick="closeTab(event, \${i})">×</span>\`;
+                    item.innerHTML = \`<span>\${tab.name}</span><div class="close-x" onclick="closeTab(event, \${i})">×</div>\`;
                     item.onclick = () => switchTab(i);
                     list.appendChild(item);
                 });
@@ -180,9 +209,10 @@
 
             function updateFrameSandbox(ifr) {
                 if(fixEnabled) {
+                    // ON = Restricted
                     ifr.setAttribute('sandbox', 'allow-forms allow-scripts allow-same-origin');
                 } else {
-                    // Unrestricted: Allows popups and Google Auth to stay contained
+                    // OFF = Unrestricted (Default)
                     ifr.removeAttribute('sandbox');
                 }
             }
@@ -224,6 +254,10 @@
       `);
       popup.document.close();
     }
+
+    document.getElementById('pageInput').addEventListener('keypress', (e) => { 
+        if (e.key === 'Enter') openSession(); 
+    });
   </script>
 </body>
 </html>
