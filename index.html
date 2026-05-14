@@ -27,7 +27,6 @@
       border-radius: 100px; transition: 0.3s;
     }
     .launch-btn:hover { transform: scale(1.05); background: #eee; }
-    .status { margin-top: 15px; font-size: 0.8rem; color: #444; }
   </style>
 </head>
 <body>
@@ -36,24 +35,17 @@
     <h1>Cosmos</h1>
     <input id="pageInput" class="main-input" type="text" placeholder="destination..." spellcheck="false">
     <br>
-    <button class="launch-btn" onclick="openSession();">Open Popup</button>
-    <div class="status" id="statusMsg">If popup is blocked, check your address bar.</div>
+    <button class="launch-btn" onclick="openSession();">Open Session</button>
   </div>
 
   <script>
     function openSession() {
       const input = document.getElementById('pageInput');
       let url = input.value.trim();
-      
       if (!url) { input.style.borderColor = "#f00"; return; }
       if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
 
       const popup = window.open('about:blank', 'CosmosSession', 'width=1280,height=720');
-
-      if (!popup || popup.closed || typeof popup.closed == 'undefined') {
-          document.getElementById('statusMsg').innerText = "❌ Popup Blocked!";
-          return;
-      }
 
       popup.document.write(`
         <!DOCTYPE html>
@@ -63,45 +55,33 @@
           <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap" rel="stylesheet">
           <style>
             body, html { margin:0; padding:0; height:100%; overflow:hidden; background:#000; font-family:'Comfortaa', cursive; color:white; }
-            iframe { width:100%; height:100%; border:none; background:#fff; }
+            #view-container { width:100%; height:100%; position:relative; }
+            iframe { width:100%; height:100%; border:none; background:#fff; position:absolute; top:0; left:0; display:none; }
+            iframe.active { display:block; }
             
-            #ghostTrigger { 
-                position:fixed; top:15px; right:15px; width:40px; height:40px; 
-                background:rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1);
-                border-radius:12px; z-index:10005; cursor:pointer; 
-                display:flex; align-items:center; justify-content:center; 
-                transition:0.3s; opacity:0.6; 
-            }
-            #ghostTrigger:hover { opacity:1; background:rgba(255,255,255,0.2); transform: scale(1.1); }
+            #ghostTrigger { position:fixed; top:15px; right:15px; width:40px; height:40px; background:rgba(255,255,255,0.1); border-radius:12px; z-index:10005; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.3s; }
             .dot { width:4px; height:4px; background:#fff; border-radius:50%; margin:0 1px; }
 
             #panel { 
-                position:fixed; top:20px; right:-380px; width:300px; 
-                height:calc(100% - 40px); background:rgba(10,10,10,0.98); 
-                border:1px solid rgba(255,255,255,0.1); border-radius:30px; 
-                transition:0.6s cubic-bezier(0.16,1,0.3,1); z-index:10001; 
-                padding:25px; box-sizing:border-box; display:flex; flex-direction:column;
-                backdrop-filter: blur(20px);
+                position:fixed; top:0; right:-400px; width:350px; height:100%; background:rgba(10,10,10,0.98); 
+                transition:0.5s cubic-bezier(0.16,1,0.3,1); z-index:10001; padding:25px; box-sizing:border-box; 
+                display:flex; flex-direction:column; backdrop-filter: blur(20px); border-left: 1px solid #222;
             }
             #panel.open { transform: translateX(-400px); }
 
-            #debugBtn {
-              position: fixed; bottom: 0; left: 0; width: 30px; height: 30px;
-              z-index: 10010; cursor: help; opacity: 0; transition: 0.3s;
-            }
-            #debugBtn:hover { opacity: 0.2; background: #fff; }
-
-            #debugOverlay {
-              position: fixed; bottom: 40px; left: 15px; width: 260px;
-              background: rgba(0,0,0,0.95); border: 1px solid #333; color: #0f0;
-              padding: 15px; font-family: monospace; font-size: 10px;
-              border-radius: 12px; display: none; z-index: 10011; pointer-events: none;
-            }
+            #tab-list { margin: 15px 0; max-height: 200px; overflow-y: auto; }
+            .tab-item { background: #151515; padding: 10px 15px; border-radius: 10px; margin-bottom: 5px; cursor: pointer; display: flex; justify-content: space-between; font-size: 0.8rem; border: 1px solid #222; }
+            .tab-item.active { border-color: #fff; background: #222; }
+            .tab-item:hover { background: #222; }
 
             input { background:#151515; border:1px solid #222; color:#fff; padding:12px 20px; border-radius:100px; outline:none; width:100%; box-sizing:border-box; margin-bottom:10px; }
-            .btn { padding:12px; background:#1a1a1a; color:#fff; border:none; border-radius:100px; cursor:pointer; font-weight:700; width:100%; margin-bottom:10px; transition: 0.2s; }
+            .btn { padding:12px; background:#1a1a1a; color:#fff; border:none; border-radius:100px; cursor:pointer; font-weight:700; width:100%; margin-bottom:10px; }
             .btn:hover { background:#fff; color:#000; }
-            .label { font-size:0.7rem; color:#444; text-transform:uppercase; margin:10px 0 5px 10px; letter-spacing: 1px; }
+            .label { font-size:0.7rem; color:#555; text-transform:uppercase; margin:15px 0 5px 5px; letter-spacing: 1px; }
+
+            #debugBtn { position: fixed; bottom: 0; left: 0; width: 30px; height: 30px; z-index: 10010; opacity: 0; }
+            #debugBtn:hover { opacity: 0.2; background: #fff; }
+            #debugOverlay { position: fixed; bottom: 40px; left: 15px; width: 260px; background: rgba(0,0,0,0.9); border: 1px solid #333; color: #0f0; padding: 15px; font-family: monospace; font-size: 10px; border-radius: 12px; display: none; z-index: 10011; }
           </style>
         </head>
         <body>
@@ -110,96 +90,140 @@
           </div>
 
           <div id="debugBtn" onclick="toggleDbg()"></div>
-          <div id="debugOverlay">
-            <b style="color:#fff">COSMOS_DEBUG</b><br><br>
-            URL: <span id="d-url">---</span><br>
-            SBX: <span id="d-sbx">---</span>
+          <div id="debugOverlay" id="dbg">
+            <b>COSMOS_DEBUG</b><br>
+            TABS: <span id="d-tabs">0</span><br>
+            ACTIVE_SBX: <span id="d-sbx">NONE</span>
           </div>
 
           <div id="panel">
-            <div style="font-weight:700; font-size:1.2rem; margin-bottom:20px;">Cosmos</div>
-            <input id="n" type="text" value="${url}">
-            <button class="btn" onclick="g()">Navigate</button>
-            <button class="btn" onclick="r()">Reload</button>
-            <div class="label">Quick Links</div>
-            <button class="btn" onclick="q('https://web.cloudmoonapp.com/')">CloudMoon</button>
+            <div style="font-weight:700; font-size:1.5rem; margin-bottom:20px;">Cosmos</div>
+            
+            <input id="n" type="text" placeholder="Enter URL...">
+            <button class="btn" onclick="addTab()">+ New Tab</button>
+
+            <div class="label">Open Tabs</div>
+            <div id="tab-list"></div>
+
             <div class="label">Settings</div>
-            <!-- Starts OFF (Unrestricted) -->
             <button id="fixBtn" class="btn" onclick="toggleFix()">CloudMoon Fix: OFF</button>
+            
             <div style="margin-top:auto;">
-               <button class="btn" style="background:#200; color:#f55; border: 1px solid #411;" onclick="window.close()">Close Session</button>
+               <button class="btn" style="background:#300; color:#f55;" onclick="window.close()">Kill Session</button>
             </div>
           </div>
 
-          <!-- NO SANDBOX BY DEFAULT (Unrestricted) -->
-          <iframe id="f" src="${url}"></iframe>
+          <div id="view-container"></div>
 
           <script>
-            const f = document.getElementById('f');
-            const p = document.getElementById('panel');
+            let tabs = [];
+            let activeIndex = -1;
+            let fixEnabled = false;
+
+            const container = document.getElementById('view-container');
+            const list = document.getElementById('tab-list');
             const n = document.getElementById('n');
             const fixBtn = document.getElementById('fixBtn');
-            const dbg = document.getElementById('debugOverlay');
 
-            let fixEnabled = false; 
+            function t() { document.getElementById('panel').classList.toggle('open'); }
 
-            function t() { p.classList.toggle('open'); }
-            
-            function updateLogs() {
-              document.getElementById('d-url').innerText = f.src;
-              document.getElementById('d-sbx').innerText = f.getAttribute('sandbox') || "NONE (Unrestricted)";
+            function addTab(url = n.value) {
+                if(!url) return;
+                if(!/^https?:\\/\\//i.test(url)) url = 'https://' + url;
+                
+                const id = 'frame-' + Date.now();
+                const ifr = document.createElement('iframe');
+                ifr.id = id;
+                ifr.src = url;
+                
+                // Set initial sandbox based on Fix State
+                updateFrameSandbox(ifr);
+
+                container.appendChild(ifr);
+                tabs.push({ id, url });
+                n.value = '';
+                switchTab(tabs.length - 1);
+                if(document.getElementById('panel').classList.contains('open')) t();
             }
 
-            function g() { 
-                let u = n.value; 
-                if(!/^https?:\\/\\//i.test(u)) u = 'https://' + u;
-                f.src = u; t(); updateLogs();
+            function switchTab(index) {
+                activeIndex = index;
+                const allIframes = container.querySelectorAll('iframe');
+                allIframes.forEach((f, i) => {
+                    f.classList.toggle('active', i === index);
+                });
+                renderTabs();
+                updateLogs();
             }
 
-            function r() { 
-                const c = f.src; 
-                f.src = 'about:blank'; 
-                setTimeout(() => { f.src = c; updateLogs(); }, 50); 
-                if(p.classList.contains('open')) t(); 
+            function closeTab(e, index) {
+                e.stopPropagation();
+                const tab = tabs[index];
+                document.getElementById(tab.id).remove();
+                tabs.splice(index, 1);
+                if(activeIndex >= tabs.length) activeIndex = tabs.length - 1;
+                if(tabs.length === 0) activeIndex = -1;
+                renderTabs();
+                switchTab(activeIndex);
             }
 
-            function q(u) { f.src = u; n.value = u; t(); updateLogs(); }
+            function renderTabs() {
+                list.innerHTML = '';
+                tabs.forEach((tab, i) => {
+                    const item = document.createElement('div');
+                    item.className = 'tab-item' + (i === activeIndex ? ' active' : '');
+                    item.innerHTML = \`<span>Tab \${i+1}</span><span onclick="closeTab(event, \${i})">×</span>\`;
+                    item.onclick = () => switchTab(i);
+                    list.appendChild(item);
+                });
+            }
+
+            function updateFrameSandbox(ifr) {
+                if(fixEnabled) {
+                    ifr.setAttribute('sandbox', 'allow-forms allow-scripts allow-same-origin');
+                } else {
+                    // Unrestricted: Allows popups and Google Auth to stay contained
+                    ifr.removeAttribute('sandbox');
+                }
+            }
 
             function toggleFix() {
                 fixEnabled = !fixEnabled;
-                if (fixEnabled) {
-                    // ON: Apply Restricted Sandbox (Jail)
-                    f.setAttribute('sandbox', 'allow-forms allow-scripts allow-same-origin');
-                    fixBtn.innerText = "CloudMoon Fix: ON";
-                    fixBtn.style.background = "#fff";
-                    fixBtn.style.color = "#000";
-                } else {
-                    // OFF: Remove Sandbox entirely (Unrestricted)
-                    f.removeAttribute('sandbox');
-                    fixBtn.innerText = "CloudMoon Fix: OFF";
-                    fixBtn.style.background = "#1a1a1a";
-                    fixBtn.style.color = "#fff";
-                }
-                r(); 
+                fixBtn.innerText = "CloudMoon Fix: " + (fixEnabled ? "ON" : "OFF");
+                fixBtn.style.background = fixEnabled ? "#fff" : "#1a1a1a";
+                fixBtn.style.color = fixEnabled ? "#000" : "#fff";
+                
+                const allIframes = container.querySelectorAll('iframe');
+                allIframes.forEach(f => {
+                    updateFrameSandbox(f);
+                    const src = f.src;
+                    f.src = 'about:blank';
+                    setTimeout(() => { f.src = src; }, 50);
+                });
+                updateLogs();
             }
 
             function toggleDbg() {
-              dbg.style.display = dbg.style.display === 'block' ? 'none' : 'block';
-              updateLogs();
+              const d = document.getElementById('debugOverlay');
+              d.style.display = d.style.display === 'block' ? 'none' : 'block';
             }
 
-            n.addEventListener('keypress', (e) => { if(e.key === 'Enter') g(); });
-            updateLogs();
+            function updateLogs() {
+              document.getElementById('d-tabs').innerText = tabs.length;
+              const current = container.querySelector('iframe.active');
+              document.getElementById('d-sbx').innerText = current ? (current.getAttribute('sandbox') || "UNRESTRICTED") : "N/A";
+            }
+
+            // Initial Tab
+            addTab('${url}');
+
+            n.addEventListener('keypress', (e) => { if(e.key === 'Enter') addTab(); });
           <\/script>
         </body>
         </html>
       `);
       popup.document.close();
     }
-
-    document.getElementById('pageInput').addEventListener('keypress', (e) => { 
-        if (e.key === 'Enter') openSession(); 
-    });
   </script>
 </body>
 </html>
