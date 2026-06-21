@@ -1,236 +1,470 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
   <meta charset="UTF-8">
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <title>Cosmos | Launch</title>
-  <script data-cfasync="false" src="//dcbbwymp1bhlf.cloudfront.net/?wbbcd=1366183"></script>
+
   <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap" rel="stylesheet">
+
   <style>
+
     :root { --bg: #000000; --pill: #1a1a1a; --white: #ffffff; }
+
     body {
+
       background: var(--bg); color: var(--white);
+
       font-family: 'Comfortaa', cursive;
+
       display: flex; flex-direction: column; justify-content: center;
+
       align-items: center; height: 100vh; margin: 0; overflow: hidden;
+
     }
+
     .main-ui { text-align: center; }
+
     h1 { font-weight: 700; letter-spacing: -2px; margin-bottom: 2rem; font-size: 4rem; opacity: 0.9; }
+
     .main-input {
+
       background: var(--pill); border: 2px solid #222; padding: 1.2rem 2.5rem;
+
       color: #fff; width: 420px; outline: none; border-radius: 100px;
+
       transition: all 0.4s ease; text-align: center; font-size: 1rem;
+
     }
+
     .main-input:focus { border-color: #444; }
+
     .launch-btn {
+
       margin-top: 2rem; background: var(--white); color: #000; border: none;
+
       padding: 1.2rem 4rem; cursor: pointer; font-weight: 700;
+
       border-radius: 100px; transition: 0.3s;
+
     }
+
     .launch-btn:hover { transform: scale(1.05); background: #eee; }
+
   </style>
+
 </head>
+
 <body>
 
+
+
   <div class="main-ui">
+
     <h1>Cosmos</h1>
+
     <input id="pageInput" class="main-input" type="text" placeholder="destination..." spellcheck="false">
+
     <br>
+
     <button class="launch-btn" onclick="openSession();">Open Session</button>
+
   </div>
 
+
+
   <script>
+
     function openSession() {
+
       const input = document.getElementById('pageInput');
+
       let url = input.value.trim();
+
       if (!url) { input.style.borderColor = "#f00"; return; }
+
       if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+
 
       const popup = window.open('about:blank', 'CosmosSession', 'width=1280,height=720');
 
+
+
       popup.document.write(`
+
         <!DOCTYPE html>
+
         <html>
+
         <head>
+
           <title>Cosmos Session</title>
+
           <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap" rel="stylesheet">
+
           <style>
+
             body, html { margin:0; padding:0; height:100%; overflow:hidden; background:#000; font-family:'Comfortaa', cursive; color:white; }
+
             #view-container { width:100%; height:100%; position:relative; }
+
             iframe { width:100%; height:100%; border:none; background:#fff; position:absolute; top:0; left:0; display:none; }
+
             iframe.active { display:block; }
+
             
+
             #ghostTrigger { position:fixed; top:15px; right:15px; width:40px; height:40px; background:rgba(255,255,255,0.1); border-radius:12px; z-index:10005; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.3s; }
+
             .dot { width:4px; height:4px; background:#fff; border-radius:50%; margin:0 1px; }
 
+
+
             #panel { 
+
                 position:fixed; top:0; right:-400px; width:350px; height:100%; background:rgba(10,10,10,0.98); 
+
                 transition:0.5s cubic-bezier(0.16,1,0.3,1); z-index:10001; padding:25px; box-sizing:border-box; 
+
                 display:flex; flex-direction:column; backdrop-filter: blur(20px); border-left: 1px solid #222;
+
             }
+
             #panel.open { transform: translateX(-400px); }
 
+
+
             #tab-list { margin: 15px 0; max-height: 400px; overflow-y: auto; }
+
             .tab-item { 
+
                 background: #111; padding: 12px 15px; border-radius: 12px; margin-bottom: 8px; 
+
                 cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+
                 font-size: 0.75rem; border: 1px solid #222; transition: 0.2s;
+
             }
+
             .tab-item.active { border-color: #555; background: #1a1a1a; }
+
             .tab-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+
             .close-x { color: #555; font-weight: bold; padding: 0 5px; }
+
             .close-x:hover { color: #f55; }
 
+
+
             input { background:#151515; border:1px solid #222; color:#fff; padding:12px 20px; border-radius:100px; outline:none; width:100%; box-sizing:border-box; margin-bottom:10px; }
+
             .btn { padding:12px; background:#1a1a1a; color:#fff; border:none; border-radius:100px; cursor:pointer; font-weight:700; width:100%; margin-bottom:10px; transition: 0.2s; }
+
             .btn:hover { background:#fff; color:#000; }
+
             .label { font-size:0.7rem; color:#555; text-transform:uppercase; margin:15px 0 5px 5px; letter-spacing: 1px; }
+
           </style>
+
         </head>
+
         <body>
+
           <div id="ghostTrigger" onclick="t()">
+
             <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+
           </div>
+
+
 
           <div id="panel">
+
             <div style="font-weight:700; font-size:1.5rem; margin-bottom:20px;">Cosmos</div>
+
             
+
             <input id="n" type="text" placeholder="destination...">
+
             <button class="btn" onclick="addTab()">+ New Tab</button>
 
+
+
             <div class="label">Quick Links</div>
+
             <button class="btn" onclick="addTab('https://web.cloudmoonapp.com/')">CloudMoon</button>
 
+
+
             <div class="label">Open Tabs</div>
+
             <div id="tab-list"></div>
 
+
+
             <div class="label">Settings</div>
+
             <button id="fixBtn" class="btn" onclick="toggleFix()">CloudMoon Fix: OFF</button>
+
             
+
             <div style="margin-top:auto;">
+
                <button class="btn" style="background:#300; color:#f55;" onclick="window.close()">Kill Session</button>
+
             </div>
+
           </div>
+
+
 
           <div id="view-container"></div>
 
+
+
           <script>
+
             let tabs = [];
+
             let activeIndex = -1;
+
             let fixEnabled = false;
 
+
+
             const container = document.getElementById('view-container');
+
             const list = document.getElementById('tab-list');
+
             const n = document.getElementById('n');
+
             const fixBtn = document.getElementById('fixBtn');
+
+
 
             function t() { document.getElementById('panel').classList.toggle('open'); }
 
+
+
             function getFriendlyName(url) {
+
                 try {
+
                     let name = url.replace(/^https?:\\/\\//i, '').split('/')[0];
+
                     if(name.includes('cloudmoon')) return "CloudMoon";
+
                     return name.charAt(0).toUpperCase() + name.slice(1);
+
                 } catch(e) { return "New Tab"; }
+
             }
+
+
 
             function addTab(url = n.value) {
+
                 if(!url) return;
+
                 if(!/^https?:\\/\\//i.test(url)) url = 'https://' + url;
+
                 
+
                 const id = 'frame-' + Date.now();
+
                 const ifr = document.createElement('iframe');
+
                 ifr.id = id;
+
                 ifr.src = url;
+
                 
+
                 updateFrameSandbox(ifr);
 
+
+
                 ifr.onload = () => {
+
                     const index = tabs.findIndex(t => t.id === id);
+
                     if (index !== -1) {
+
                         tabs[index].name = getFriendlyName(ifr.src);
+
                         renderTabs();
+
                     }
+
                 };
 
+
+
                 container.appendChild(ifr);
+
                 tabs.push({ id, url, name: getFriendlyName(url) });
+
                 n.value = '';
+
                 switchTab(tabs.length - 1);
+
             }
+
+
 
             function switchTab(index) {
+
                 if (index < 0) return;
+
                 activeIndex = index;
+
                 const allIframes = container.querySelectorAll('iframe');
+
                 allIframes.forEach((f, i) => {
+
                     f.classList.toggle('active', i === index);
+
                 });
+
                 renderTabs();
+
             }
+
+
 
             function closeTab(e, index) {
+
                 e.stopPropagation();
+
                 const tab = tabs[index];
+
                 document.getElementById(tab.id).remove();
+
                 tabs.splice(index, 1);
+
                 
+
                 if (tabs.length === 0) {
+
                     activeIndex = -1;
+
                 } else if (activeIndex >= index) {
+
                     activeIndex = Math.max(0, activeIndex - 1);
+
                 }
+
                 
+
                 renderTabs();
+
                 if (activeIndex !== -1) switchTab(activeIndex);
+
             }
+
+
 
             function renderTabs() {
+
                 list.innerHTML = '';
+
                 tabs.forEach((tab, i) => {
+
                     const item = document.createElement('div');
+
                     item.className = 'tab-item' + (i === activeIndex ? ' active' : '');
+
                     item.innerHTML = \`<span>\${tab.name}</span><div class="close-x" onclick="closeTab(event, \${i})">×</div>\`;
+
                     item.onclick = () => switchTab(i);
+
                     list.appendChild(item);
+
                 });
+
             }
+
+
 
             function updateFrameSandbox(ifr) {
+
                 if(fixEnabled) {
+
                     ifr.setAttribute('sandbox', 'allow-forms allow-scripts allow-same-origin');
+
                 } else {
+
                     ifr.removeAttribute('sandbox');
+
                 }
+
             }
+
+
 
             function toggleFix() {
+
                 fixEnabled = !fixEnabled;
+
                 fixBtn.innerText = "CloudMoon Fix: " + (fixEnabled ? "ON" : "OFF");
+
                 fixBtn.style.background = fixEnabled ? "#fff" : "#1a1a1a";
+
                 fixBtn.style.color = fixEnabled ? "#000" : "#fff";
+
                 
+
                 const allIframes = container.querySelectorAll('iframe');
+
                 allIframes.forEach(f => {
+
                     updateFrameSandbox(f);
+
                     const src = f.src;
+
                     f.src = 'about:blank';
+
                     setTimeout(() => { f.src = src; }, 50);
+
                 });
+
             }
 
+
+
             addTab('${url}');
+
             n.addEventListener('keypress', (e) => { if(e.key === 'Enter') addTab(); });
+
           <\/script>
+
         </body>
+
         </html>
+
       `);
+
       popup.document.close();
+
     }
 
+
+
     document.getElementById('pageInput').addEventListener('keypress', (e) => { 
+
         if (e.key === 'Enter') openSession(); 
+
     });
+
   </script>
+
 </body>
-</html>
+
+</html> 
+
