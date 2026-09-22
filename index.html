@@ -4759,288 +4759,174 @@ function openSession() {
   }
 
 
-  function addTab(
-    rawUrl
-  ) {
+  function normalizeTabUrl(rawUrl) {
+    let tabUrl = String(rawUrl ?? "").trim();
+    if (!tabUrl) return "";
 
-    let tabUrl =
-      (
-        rawUrl ??
-        n.value
-      ).trim();
-
-
-    if (!tabUrl) return;
-
-
-    if (
-      !/^https?:\/\//i.test(
-        tabUrl
-      )
-    ) {
-
-      tabUrl =
-        "https://" +
-        tabUrl;
+    if (!/^https?:\/\//i.test(tabUrl)) {
+      tabUrl = "https://" + tabUrl;
     }
 
+    try {
+      const parsed = new URL(tabUrl);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return "";
+      }
+      return parsed.href;
+    } catch {
+      return "";
+    }
+  }
+
+
+  function addTab(rawUrl) {
+    const source = rawUrl !== undefined ? rawUrl : n.value;
+    const tabUrl = normalizeTabUrl(source);
+
+    if (!tabUrl) {
+      if (rawUrl === undefined) {
+        n.focus();
+        n.style.borderColor = "#f00";
+        setTimeout(() => {
+          n.style.borderColor = "#222";
+        }, 900);
+      }
+      return false;
+    }
 
     const id =
       "frame-" +
       Date.now() +
       "-" +
-      Math.random()
-        .toString(36)
-        .slice(2);
+      Math.random().toString(36).slice(2);
 
-
-    const iframe =
-      document.createElement(
-        "iframe"
-      );
-
-
+    const iframe = document.createElement("iframe");
     iframe.id = id;
+    iframe.title = getFriendlyName(tabUrl);
+    iframe.loading = "eager";
+    iframe.referrerPolicy = "no-referrer-when-downgrade";
+    iframe.allow = "fullscreen; autoplay; clipboard-read; clipboard-write";
+    iframe.setAttribute("allowfullscreen", "");
 
-    iframe.src = tabUrl;
+    // Keep the normal mode unrestricted. The CloudMoon Fix option can
+    // apply the sandbox only when the user explicitly enables it.
+    updateFrameSandbox(iframe);
 
-
-    updateFrameSandbox(
-      iframe
-    );
-
-
-    iframe.onload =
-      function () {
-
-        const index =
-          tabs.findIndex(
-            tab =>
-              tab.id === id
-          );
-
-
-        if (index !== -1) {
-
-          tabs[index].name =
-            getFriendlyName(
-              tabUrl
-            );
-
-          renderTabs();
-        }
-      };
-
-
-    container.appendChild(
-      iframe
-    );
-
-
-    tabs.push({
+    const tab = {
       id,
       url: tabUrl,
-      name:
-        getFriendlyName(
-          tabUrl
-        )
+      name: getFriendlyName(tabUrl)
+    };
+
+    tabs.push(tab);
+    container.appendChild(iframe);
+
+    iframe.addEventListener("load", function () {
+      const current = tabs.find(t => t.id === id);
+      if (current) {
+        current.name = getFriendlyName(tabUrl);
+        renderTabs();
+      }
     });
 
+    iframe.addEventListener("error", function () {
+      console.error("Cosmos iframe failed to load:", tabUrl);
+    });
 
     n.value = "";
+    switchTab(tabs.length - 1);
+    return true;
+  }
 
 
-    switchTab(
-      tabs.length - 1
-    );
+  function switchTab(index) {
+    if (index < 0 || index >= tabs.length) return;
 
+    activeIndex = index;
 
+    tabs.forEach((tab, tabIndex) => {
+      const frame = document.getElementById(tab.id);
+      if (frame) {
+        frame.classList.toggle("active", tabIndex === index);
+        frame.style.display = tabIndex === index ? "block" : "none";
+        frame.style.visibility = tabIndex === index ? "visible" : "hidden";
+      }
+    });
+
+    renderTabs();
     syncPresence();
   }
 
 
-  function switchTab(
-    index
-  ) {
+  function closeTab(index) {
+    if (index < 0 || index >= tabs.length) return;
 
-    if (
-      index < 0 ||
-      index >= tabs.length
-    ) {
+    const removed = tabs[index];
+    const frame = document.getElementById(removed.id);
+    if (frame) frame.remove();
+
+    tabs.splice(index, 1);
+
+    if (!tabs.length) {
+      activeIndex = -1;
+      renderTabs();
+      syncPresence();
       return;
     }
 
-
-    activeIndex =
-      index;
-
-
-    container
-      .querySelectorAll(
-        "iframe"
-      )
-      .forEach(
-        (frame, frameIndex) => {
-
-          frame.classList.toggle(
-            "active",
-            frameIndex === index
-          );
-        }
-      );
-
-
-    renderTabs();
-
-    syncPresence();
-  }
-
-
-  function closeTab(
-    index
-  ) {
-
-    const tab =
-      tabs[index];
-
-
-    if (!tab) return;
-
-
-    const frame =
-      document.getElementById(
-        tab.id
-      );
-
-
-    if (frame) {
-      frame.remove();
-    }
-
-
-    tabs.splice(
-      index,
-      1
-    );
-
-
-    if (
-      tabs.length === 0
-    ) {
-
-      activeIndex = -1;
-
-    } else if (
-      activeIndex > index
-    ) {
-
+    if (activeIndex > index) {
       activeIndex--;
-
-    } else if (
-      activeIndex >=
-      tabs.length
-    ) {
-
-      activeIndex =
-        tabs.length - 1;
+    } else if (activeIndex === index) {
+      activeIndex = Math.min(index, tabs.length - 1);
+    } else if (activeIndex >= tabs.length) {
+      activeIndex = tabs.length - 1;
     }
 
-
-    renderTabs();
-
-
-    if (
-      activeIndex !== -1
-    ) {
-
-      switchTab(
-        activeIndex
-      );
-    }
-
-
-    syncPresence();
+    switchTab(activeIndex);
   }
 
 
   function renderTabs() {
-
     list.replaceChildren();
 
+    tabs.forEach((tab, index) => {
+      const item = document.createElement("div");
+      item.className =
+        "tab-item" + (index === activeIndex ? " active" : "");
+      item.setAttribute("role", "button");
+      item.setAttribute("tabindex", "0");
+      item.title = tab.url;
 
-    tabs.forEach(
-      (tab, index) => {
+      const name = document.createElement("span");
+      name.textContent = tab.name || "New Tab";
 
-        const item =
-          document.createElement(
-            "div"
-          );
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "close-x";
+      close.textContent = "×";
+      close.setAttribute("aria-label", "Close " + (tab.name || "tab"));
 
+      close.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeTab(index);
+      });
 
-        item.className =
-          "tab-item" +
-          (
-            index === activeIndex
-              ? " active"
-              : ""
-          );
+      item.append(name, close);
 
+      item.addEventListener("click", function () {
+        switchTab(index);
+      });
 
-        const name =
-          document.createElement(
-            "span"
-          );
+      item.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          switchTab(index);
+        }
+      });
 
-
-        name.textContent =
-          tab.name;
-
-
-        const close =
-          document.createElement(
-            "div"
-          );
-
-
-        close.className =
-          "close-x";
-
-
-        close.textContent =
-          "×";
-
-
-        close.addEventListener(
-          "click",
-          function (event) {
-
-            event.stopPropagation();
-
-            closeTab(index);
-          }
-        );
-
-
-        item.append(
-          name,
-          close
-        );
-
-
-        item.addEventListener(
-          "click",
-          function () {
-
-            switchTab(index);
-          }
-        );
-
-
-        list.appendChild(
-          item
-        );
-      }
-    );
+      list.appendChild(item);
+    });
   }
 
 
@@ -5798,10 +5684,11 @@ function openSession() {
   );
 
 
+  renderTabs();
+
   addTab(
     ${safeInitialUrl}
   );
-
 
   syncPresence();
 
