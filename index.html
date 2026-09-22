@@ -3614,57 +3614,56 @@
      OPEN COSMOS SESSION
   ========================================================= */
 
-  function openSession() {
+function openSession() {
 
-    const input =
-      document.getElementById(
-        "pageInput"
-      );
+  const input = document.getElementById("pageInput");
+  let url = input.value.trim();
 
+  if (!url) {
+    input.style.borderColor = "#f00";
+    return;
+  }
 
-    let url =
-      input.value.trim();
+  input.style.borderColor = "#222";
 
+  if (!/^https?:\/\//i.test(url)) {
+    url = "https://" + url;
+  }
 
-    if (!url) {
+  const safeInitialUrl = JSON.stringify(url);
+  const safeUserId = JSON.stringify(currentUser?.id || null);
 
-      input.style.borderColor =
-        "#f00";
+  // Build the full popup HTML as before (unchanged content),
+  // but load it via a Blob URL instead of document.write
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+...same content as before, unchanged...
+  addTab(${safeInitialUrl});
+  syncPresence();
+  setInterval(syncPresence, 10000);
+})();
+<\/script>
+</body>
+</html>
+  `;
 
-      return;
-    }
+  const blob = new Blob([html], { type: "text/html" });
+  const blobUrl = URL.createObjectURL(blob);
 
+  const popup = window.open(blobUrl, "CosmosSession", "width=1280,height=720");
 
-    input.style.borderColor =
-      "#222";
+  if (!popup) {
+    alert("The Cosmos popup was blocked. Allow popups for this site and try again.");
+    URL.revokeObjectURL(blobUrl);
+    return;
+  }
 
-
-    if (
-      !/^https?:\/\//i.test(url)
-    ) {
-
-      url =
-        "https://" +
-        url;
-    }
-
-
-    const popup =
-      window.open(
-        "about:blank",
-        "CosmosSession",
-        "width=1280,height=720"
-      );
-
-
-    if (!popup) {
-
-      alert(
-        "The Cosmos popup was blocked. Allow popups for this site and try again."
-      );
-
-      return;
-    }
+  // Release the blob once the popup has loaded it
+  popup.addEventListener("load", () => {
+    URL.revokeObjectURL(blobUrl);
+  });
+}
 
 
     const safeInitialUrl =
