@@ -301,12 +301,54 @@
 
   console.log("Cosmos: Supabase client initialized");
 
-  let currentUser = null;
+  const COSMOS_PROFILE = { firstName: "Drake", lastName: "Henry", graduationYear: 2031 };\n  let currentUser = null;
+    await loadCosmosNicknames();
+  let cosmosNicknames = {};
+
+  async function loadCosmosNicknames() {
+    try {
+      const { data, error } = await supabaseClient
+        .from("cosmos_nicknames")
+        .select("user_id,nickname");
+      if (error) throw error;
+      cosmosNicknames = Object.fromEntries((data || []).map(r => [r.user_id, r.nickname]));
+    } catch (e) {
+      console.error("Nickname load failed:", e);
+      cosmosNicknames = {};
+    }
+  }
+
+  function getCosmosNickname(userId, fallback = "User") {
+    return (cosmosNicknames[userId] || fallback).trim() || fallback;
+  }
+
+  async function setCosmosNickname(userId, nickname) {
+    const value = String(nickname || "").trim();
+    if (!value) {
+      const { error } = await supabaseClient
+        .from("cosmos_nicknames")
+        .delete()
+        .eq("user_id", userId);
+      if (error) throw error;
+    } else {
+      const { error } = await supabaseClient
+        .from("cosmos_nicknames")
+        .upsert({ user_id: userId, nickname: value }, { onConflict: "user_id" });
+      if (error) throw error;
+    }
+    await loadCosmosNicknames();
+  }
   let currentRole = null;
   let isAdmin = false;
   let cachedUsers = [];
   let cachedPresence = new Map();
   let cachedBans = [];
+
+  function isValidCosmosEmail(email) {
+    return /^\d{2}[a-z]+(?:\.[a-z]+)?@stu\.kingsford\.org$/i.test(
+      String(email || "").trim()
+    );
+  }
 
   function showLoginError(message) {
     document.getElementById("loginError").textContent = message || "";
@@ -410,8 +452,7 @@
     const name =
       currentUser.user_metadata?.full_name ||
       currentUser.user_metadata?.name ||
-      currentUser.email ||
-      "Account";
+      `${COSMOS_PROFILE.firstName} ${COSMOS_PROFILE.lastName}`;
 
     document.getElementById("accountName").textContent = name;
     await loadRole(currentUser.id);
@@ -730,6 +771,18 @@
         ${currentRole !== "mod" ? `<div class="admin-row-actions"><button class="mini-action danger" onclick="deleteBroadcast('${b.id}')">Delete</button></div>` : ""}
       </div>`;
     }).join("") || '<div class="muted">No broadcasts.</div>';
+  }
+
+  async function promptNickname(userId, email) {
+    const current = cosmosNicknames[userId] || "";
+    const nickname = window.prompt("Nickname for " + email + " (leave blank to clear):", current);
+    if (nickname === null) return;
+    try {
+      await setCosmosNickname(userId, nickname);
+      if (typeof refreshAdmin === "function") await refreshAdmin();
+    } catch (e) {
+      alert("Could not save nickname: " + (e.message || e));
+    }
   }
 
   function renderUsers(rows, error) {
@@ -1087,8 +1140,26 @@
           const panel=document.getElementById('panel');
           const ghost=document.getElementById('ghostTrigger');
 
-          function toggleMenu(){ panel.classList.toggle('open'); }
-          ghost.addEventListener('click', toggleMenu);
+          function setMenuOpen(open){
+            panel.classList.toggle('open', !!open);
+            ghost.setAttribute('aria-expanded', open ? 'true' : 'false');
+          }
+
+          function toggleMenu(event){
+            if(event){
+              event.preventDefault();
+              event.stopPropagation();
+              event.stopImmediatePropagation?.();
+            }
+            setMenuOpen(!panel.classList.contains('open'));
+          }
+
+          ghost.addEventListener('pointerdown', toggleMenu, {capture:true});
+          ghost.addEventListener('click', (event)=>{
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation?.();
+          }, {capture:true});
 
           async function syncPresence(){
             try{
@@ -1312,6 +1383,11 @@
             }catch(e){ alert(e.message||e); }
           }
 
+          document.addEventListener('pointerdown', (event)=>{
+            if(!panel.contains(event.target) && !ghost.contains(event.target)){
+              setMenuOpen(false);
+            }
+          });
           document.getElementById('newTabBtn').addEventListener('click',()=>addTab());
           document.getElementById('cloudmoonBtn').addEventListener('click',()=>addTab('https://web.cloudmoonapp.com/'));
           document.getElementById('broadcastsBtn').addEventListener('click',()=>openOverlay(broadcastsBox));
