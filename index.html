@@ -873,6 +873,59 @@
 
         <section class="admin-card">
 
+          <h3>Account & Screen Tools</h3>
+
+          <p class="muted">
+            Account deletion requires the secure Supabase Edge Function included with this update.
+            Screen images are delivered as Cosmos broadcasts.
+          </p>
+
+          <input
+            id="deleteUserId"
+            class="admin-field"
+            placeholder="User ID to permanently delete"
+          >
+
+          <button
+            class="admin-action"
+            style="background:#300;color:#ff7777"
+            onclick="deleteMemberAccount()"
+          >
+            Permanently Delete Account
+          </button>
+
+          <input
+            id="screenImageUrl"
+            class="admin-field"
+            placeholder="Image URL to show on users' screens"
+          >
+
+          <input
+            id="screenImageSeconds"
+            class="admin-field"
+            type="number"
+            min="1"
+            max="120"
+            value="10"
+            placeholder="Seconds"
+          >
+
+          <button
+            class="admin-action"
+            onclick="showImageOnScreens()"
+          >
+            Show Image On Screens
+          </button>
+
+          <div
+            id="accountToolsStatus"
+            class="error"
+          ></div>
+
+        </section>
+
+        <section class="admin-card">
+
           <h3>Moderators</h3>
 
           <p class="muted">
@@ -2235,7 +2288,7 @@
 
 
     const ONLINE_MS =
-      90000;
+      30000;
 
 
     element.innerHTML =
@@ -2287,12 +2340,9 @@
 
         const online =
           !!presence &&
-          (
-            Date.now() -
-            new Date(
-              presence.last_seen
-            ).getTime()
-          ) < ONLINE_MS;
+          (typeof presence.online === "boolean"
+            ? presence.online
+            : (Date.now() - new Date(presence.last_seen).getTime()) < ONLINE_MS);
 
 
         const tabs =
@@ -2591,60 +2641,37 @@
     if (error) return;
 
 
-    cachedPresence =
-      new Map();
+    cachedPresence = new Map();
 
+    const now = Date.now();
+    const ONLINE_MS = 30000;
 
     for (const p of data || []) {
+      const lastSeenMs = new Date(p.last_seen).getTime();
+      if (!Number.isFinite(lastSeenMs)) continue;
 
-      const existing =
-        cachedPresence.get(
-          p.user_id
-        );
-
+      const existing = cachedPresence.get(p.user_id);
+      const sessionTabs = Array.isArray(p.tabs) ? p.tabs : [];
 
       if (!existing) {
-
-        cachedPresence.set(
-          p.user_id,
-          {
-            user_id: p.user_id,
-            sessions: [p],
-            tabs:
-              Array.isArray(p.tabs)
-                ? p.tabs
-                : [],
-            active_tab:
-              p.active_tab,
-            last_seen:
-              p.last_seen
-          }
-        );
-
+        cachedPresence.set(p.user_id, {
+          user_id: p.user_id,
+          sessions: [p],
+          tabs: sessionTabs.slice(),
+          active_tab: p.active_tab,
+          last_seen: p.last_seen,
+          online: now - lastSeenMs < ONLINE_MS
+        });
       } else {
-
         existing.sessions.push(p);
+        existing.tabs.push(...sessionTabs);
 
-        existing.tabs.push(
-          ...(Array.isArray(p.tabs)
-            ? p.tabs
-            : [])
-        );
-
-
-        if (
-          new Date(p.last_seen) >
-          new Date(
-            existing.last_seen
-          )
-        ) {
-
-          existing.last_seen =
-            p.last_seen;
-
-          existing.active_tab =
-            p.active_tab;
+        if (lastSeenMs > new Date(existing.last_seen).getTime()) {
+          existing.last_seen = p.last_seen;
+          existing.active_tab = p.active_tab;
         }
+
+        existing.online = existing.online || now - lastSeenMs < ONLINE_MS;
       }
     }
 
@@ -2653,9 +2680,11 @@
   }
 
 
+  refreshPresence();
+
   setInterval(
     refreshPresence,
-    10000
+    5000
   );
 
 
@@ -2957,6 +2986,97 @@
     ).value = userId;
 
     await unbanSelectedUser();
+  }
+
+
+  /* =========================================================
+     ACCOUNT / SCREEN MODERATION TOOLS
+  ========================================================= */
+
+  async function deleteMemberAccount() {
+
+    if (!["owner", "admin"].includes(currentRole)) return;
+
+    const userId = document.getElementById("deleteUserId").value.trim();
+    const status = document.getElementById("accountToolsStatus");
+
+    if (!userId) {
+      status.textContent = "Enter a user ID.";
+      return;
+    }
+
+    if (userId === currentUser?.id) {
+      status.textContent = "You cannot delete your own account from the admin panel.";
+      return;
+    }
+
+    const user = cachedUsers.find(u => u.id === userId);
+    const label = user?.email || user?.display_name || userId;
+    if (!confirm(`PERMANENTLY delete ${label}? This cannot be undone.`)) return;
+
+    status.textContent = "Deleting account...";
+
+    try {
+      const { data, error } = await supabaseClient.functions.invoke(
+        "delete-user",
+        { body: { user_id: userId } }
+      );
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      await writeClientLog(
+        "delete_user",
+        userId,
+        "Account permanently deleted through delete-user Edge Function"
+      );
+
+      status.textContent = "Account permanently deleted.";
+      document.getElementById("deleteUserId").value = "";
+      await refreshAdmin();
+    } catch (error) {
+      console.error("Account deletion failed:", error);
+      status.textContent =
+        "Delete failed. Deploy the included delete-user Edge Function and verify its service-role secret.";
+    }
+  }
+
+
+  async function showImageOnScreens() {
+
+    if (!["mod", "admin", "owner"].includes(currentRole)) return;
+
+    const url = document.getElementById("screenImageUrl").value.trim();
+    const seconds = Math.max(1, Math.min(120, Number(document.getElementById("screenImageSeconds").value) || 10));
+    const status = document.getElementById("accountToolsStatus");
+
+    try {
+      const parsed = new URL(url);
+      if (!/^https?:$/.test(parsed.protocol)) throw new Error("Invalid URL");
+    } catch {
+      status.textContent = "Enter a valid http:// or https:// image URL.";
+      return;
+    }
+
+    const payload = "COSMOS_IMAGE:" + JSON.stringify({ url, seconds });
+
+    const { error } = await supabaseClient
+      .from("broadcasts")
+      .insert({
+        message: payload,
+        admin_id: currentUser.id,
+        active: true,
+        target_user_id: null
+      });
+
+    if (error) {
+      status.textContent = error.message;
+      return;
+    }
+
+    status.textContent = `Image sent to active Cosmos sessions for ${seconds} seconds.`;
+    document.getElementById("screenImageUrl").value = "";
+    await refreshAdmin();
   }
 
 
@@ -3819,6 +3939,44 @@ function openSession() {
       display: block;
     }
 
+    #screenImageOverlay {
+
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(0,0,0,.92);
+      z-index: 2147483646;
+    }
+
+    #screenImageOverlay.open {
+      display: flex;
+    }
+
+    #screenImageOverlay img {
+      max-width: 94vw;
+      max-height: 90vh;
+      object-fit: contain;
+      border-radius: 16px;
+      box-shadow: 0 20px 70px rgba(0,0,0,.65);
+    }
+
+    #screenImageClose {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      border: 1px solid #333;
+      background: #111;
+      color: #fff;
+      border-radius: 999px;
+      width: 42px;
+      height: 42px;
+      cursor: pointer;
+      font-size: 18px;
+    }
+
     #broadcastToast {
 
       position: fixed;
@@ -4257,6 +4415,14 @@ function openSession() {
 
     </div>
 
+  </div>
+
+
+  <!-- ADMIN SCREEN IMAGE -->
+
+  <div id="screenImageOverlay" aria-hidden="true">
+    <button id="screenImageClose" type="button" aria-label="Close">×</button>
+    <img id="screenImage" alt="Cosmos announcement">
   </div>
 
 
@@ -4953,6 +5119,55 @@ function openSession() {
     );
 
 
+  const screenImageOverlay =
+    document.getElementById(
+      "screenImageOverlay"
+    );
+
+  const screenImage =
+    document.getElementById(
+      "screenImage"
+    );
+
+  const screenImageClose =
+    document.getElementById(
+      "screenImageClose"
+    );
+
+  let screenImageTimer = null;
+
+  function closeScreenImage() {
+    if (screenImageTimer) {
+      clearTimeout(screenImageTimer);
+      screenImageTimer = null;
+    }
+    screenImageOverlay.classList.remove("open");
+    screenImageOverlay.setAttribute("aria-hidden", "true");
+    screenImage.removeAttribute("src");
+  }
+
+  function showScreenImage(url, seconds = 10) {
+    try {
+      const parsed = new URL(url);
+      if (!/^https?:$/.test(parsed.protocol)) return;
+    } catch {
+      return;
+    }
+
+    screenImage.src = url;
+    screenImageOverlay.classList.add("open");
+    screenImageOverlay.setAttribute("aria-hidden", "false");
+
+    if (screenImageTimer) clearTimeout(screenImageTimer);
+    screenImageTimer = setTimeout(
+      closeScreenImage,
+      Math.max(1, Math.min(120, Number(seconds) || 10)) * 1000
+    );
+  }
+
+  screenImageClose.addEventListener("click", closeScreenImage);
+
+
   const broadcastList =
     document.getElementById(
       "broadcastList"
@@ -5184,9 +5399,17 @@ function openSession() {
         window.__lastBroadcastId =
           newest.id;
 
-        showBroadcast(
-          newest.message
-        );
+        const IMAGE_PREFIX = "COSMOS_IMAGE:";
+        if (typeof newest.message === "string" && newest.message.startsWith(IMAGE_PREFIX)) {
+          try {
+            const payload = JSON.parse(newest.message.slice(IMAGE_PREFIX.length));
+            showScreenImage(payload.url, payload.seconds);
+          } catch (error) {
+            console.error("Invalid Cosmos image broadcast:", error);
+          }
+        } else {
+          showBroadcast(newest.message);
+        }
       }
 
     } catch (error) {
