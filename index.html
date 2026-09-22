@@ -73,10 +73,25 @@
     .admin-card h3 { margin-top:0; }
     textarea { width:100%; min-height:130px; resize:vertical; background:#151515; border:1px solid #252525; color:#fff; border-radius:14px; padding:14px; outline:none; font-family:inherit; }
     .admin-action { width:100%; margin-top:10px; padding:12px; border:0; border-radius:999px; cursor:pointer; font-family:inherit; font-weight:700; }
-    .table { max-height:350px; overflow:auto; }
-    .row { border-bottom:1px solid #1e1e1e; padding:11px 0; font-size:.8rem; }
+    .table { max-height:420px; overflow:auto; }
+    .row { border-bottom:1px solid #1e1e1e; padding:12px 0; font-size:.8rem; }
     .row:last-child { border-bottom:0; }
     .muted { color:#666; }
+    .admin-toolbar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px; }
+    .admin-toolbar .small-btn.active { background:#fff; color:#000; }
+    .admin-section-wide { grid-column:1 / -1; }
+    .admin-field { width:100%; padding:11px 13px; background:#151515; border:1px solid #252525; color:#fff; border-radius:12px; outline:none; font-family:inherit; margin-top:8px; }
+    .admin-select { width:100%; padding:11px 13px; background:#151515; border:1px solid #252525; color:#fff; border-radius:12px; outline:none; font-family:inherit; margin-top:8px; }
+    .admin-row-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
+    .mini-action { padding:7px 10px; border:1px solid #292929; border-radius:999px; background:#151515; color:#fff; cursor:pointer; font:inherit; font-size:.72rem; }
+    .mini-action:hover { background:#fff; color:#000; }
+    .mini-action.danger { color:#ff7777; }
+    .mini-action.danger:hover { background:#ff5555; color:#000; }
+    .badge { display:inline-block; padding:4px 8px; border-radius:999px; background:#181818; color:#aaa; font-size:.68rem; margin-left:5px; }
+    .stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:18px; }
+    .stat { background:#0d0d0d; border:1px solid #222; border-radius:15px; padding:14px; }
+    .stat b { display:block; font-size:1.3rem; margin-top:5px; }
+    @media(max-width:700px) { .stat-grid { grid-template-columns:1fr 1fr; } }
     @media(max-width:700px) {
       h1 { font-size:3rem; }
       .main-input { width:min(420px,85vw); }
@@ -128,33 +143,102 @@
   <div id="adminPanel" class="hidden">
     <div class="admin-wrap">
       <div class="admin-head">
-        <h2>Cosmos Admin</h2>
+        <div>
+          <h2>Cosmos Admin</h2>
+          <div id="adminRoleLabel" class="muted" style="margin-top:6px"></div>
+        </div>
         <button class="small-btn" onclick="closeAdmin()">Close</button>
       </div>
 
-      <div class="admin-grid">
+      <div class="stat-grid">
+        <div class="stat"><span class="muted">Users</span><b id="statUsers">—</b></div>
+        <div class="stat"><span class="muted">Banned</span><b id="statBanned">—</b></div>
+        <div class="stat"><span class="muted">Mods</span><b id="statMods">—</b></div>
+        <div class="stat"><span class="muted">Broadcasts</span><b id="statBroadcasts">—</b></div>
+      </div>
+
+      <div class="admin-toolbar">
+        <button id="tabUsers" class="small-btn active" onclick="showAdminTab('users')">Users</button>
+        <button id="tabBroadcasts" class="small-btn" onclick="showAdminTab('broadcasts')">Broadcasts</button>
+        <button id="tabModeration" class="small-btn" onclick="showAdminTab('moderation')">Moderation</button>
+        <button id="tabLogs" class="small-btn" onclick="showAdminTab('logs')">Logs</button>
+        <button id="tabChat" class="small-btn" onclick="showAdminTab('chat')">Chat</button>
+        <button id="tabTools" class="small-btn" onclick="showAdminTab('tools')">Tools</button>
+        <button class="small-btn" onclick="refreshAdmin()">Refresh</button>
+      </div>
+
+      <section id="adminUsersTab" class="admin-grid">
+        <section class="admin-card admin-section-wide">
+          <h3>Users</h3>
+          <input id="userSearch" class="admin-field" placeholder="Search by email, name, or user ID..." oninput="renderCurrentUsers()">
+          <div id="userList" class="table"></div>
+        </section>
+      </section>
+
+      <section id="adminBroadcastsTab" class="admin-grid hidden">
         <section class="admin-card">
-          <h3>Broadcast</h3>
-          <textarea id="broadcastText" placeholder="Message everyone..."></textarea>
+          <h3>Send Broadcast</h3>
+          <textarea id="broadcastText" placeholder="Message..."></textarea>
+          <select id="broadcastTarget" class="admin-select">
+            <option value="all">Everyone</option>
+          </select>
           <button class="admin-action" onclick="sendBroadcast()">Send Broadcast</button>
           <div id="broadcastStatus" class="error"></div>
         </section>
 
         <section class="admin-card">
-          <h3>Recent Broadcasts</h3>
+          <h3>Broadcast History</h3>
           <div id="adminBroadcastList" class="table"></div>
         </section>
+      </section>
 
+      <section id="adminModerationTab" class="admin-grid hidden">
         <section class="admin-card">
-          <h3>Users</h3>
-          <div id="userList" class="table"></div>
+          <h3>Ban / Unban</h3>
+          <p class="muted">Select a user from the Users tab, then manage their ban here.</p>
+          <input id="moderationUserId" class="admin-field" placeholder="User ID">
+          <input id="banReason" class="admin-field" placeholder="Ban reason">
+          <button class="admin-action" onclick="banSelectedUser()">Ban User</button>
+          <button class="admin-action" style="background:#181818;color:#fff" onclick="unbanSelectedUser()">Unban User</button>
+          <div id="moderationStatus" class="error"></div>
         </section>
 
         <section class="admin-card">
+          <h3>Moderators</h3>
+          <p class="muted">Mods can send broadcasts and view users/logs. They cannot ban users or manage roles.</p>
+          <input id="modUserId" class="admin-field" placeholder="User ID to make a moderator">
+          <button class="admin-action" onclick="addModerator()">Add Moderator</button>
+          <input id="removeModUserId" class="admin-field" placeholder="Moderator user ID">
+          <button class="admin-action" style="background:#181818;color:#fff" onclick="removeModerator()">Remove Moderator</button>
+          <div id="modStatus" class="error"></div>
+        </section>
+      </section>
+
+      <section id="adminChatTab" class="admin-grid hidden">
+        <section class="admin-card admin-section-wide">
+          <h3>Live Chat</h3>
+          <p class="muted">View and moderate the Cosmos chat. Messages are user-generated content.</p>
+          <div id="adminChatList" class="table"></div>
+          <button class="admin-action" onclick="refreshChat()">Refresh Chat</button>
+        </section>
+      </section>
+
+      <section id="adminToolsTab" class="admin-grid hidden">
+        <section class="admin-card">
+          <h3>Safe Admin Tools</h3>
+          <p class="muted">These tools affect only Cosmos UI and do not remotely control a student's device.</p>
+          <button class="admin-action" onclick="toggleMaintenance()">Toggle Maintenance Mode</button>
+          <button class="admin-action" style="background:#181818;color:#fff" onclick="clearBroadcasts()">Deactivate All Broadcasts</button>
+          <div id="toolsStatus" class="error"></div>
+        </section>
+      </section>
+
+      <section id="adminLogsTab" class="admin-grid hidden">
+        <section class="admin-card admin-section-wide">
           <h3>Admin Logs</h3>
           <div id="logList" class="table"></div>
         </section>
-      </div>
+      </section>
     </div>
   </div>
 
@@ -168,10 +252,16 @@
     SUPABASE_PUBLISHABLE_KEY
   );
 
+  // Expose the client to the session popup so Broadcasts and Live Chat can use the same authenticated session.
+  window.supabaseClient = supabaseClient;
+
   console.log("Cosmos: Supabase client initialized");
 
   let currentUser = null;
+  let currentRole = null;
   let isAdmin = false;
+  let cachedUsers = [];
+  let cachedBans = [];
 
   function showLoginError(message) {
     document.getElementById("loginError").textContent = message || "";
@@ -186,12 +276,42 @@
 
     if (error) {
       console.error(error);
+      currentRole = null;
       isAdmin = false;
       return;
     }
 
-    isAdmin = data?.role === "admin" || data?.role === "owner";
+    currentRole = data?.role || null;
+    isAdmin = ["mod", "admin", "owner"].includes(currentRole);
     document.getElementById("adminOpen").classList.toggle("hidden", !isAdmin);
+    const roleLabel = document.getElementById("adminRoleLabel");
+    if (roleLabel) roleLabel.textContent = currentRole ? "Role: " + currentRole : "";
+  }
+
+  async function checkBan(userId) {
+    const { data, error } = await supabaseClient
+      .from("banned_users")
+      .select("reason,expires_at")
+      .eq("user_id", userId)
+      .eq("active", true)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Ban check failed:", error);
+      return false;
+    }
+
+    if (!data) return false;
+
+    const expired = data.expires_at && new Date(data.expires_at) <= new Date();
+    if (expired) {
+      await supabaseClient.from("banned_users").update({active:false}).eq("user_id", userId);
+      return false;
+    }
+
+    await supabaseClient.auth.signOut();
+    showLoginError("This account is banned." + (data.reason ? " Reason: " + data.reason : ""));
+    return true;
   }
 
   async function handleSession(session) {
@@ -202,9 +322,12 @@
 
     if (!currentUser) {
       isAdmin = false;
+      currentRole = null;
       document.getElementById("adminOpen").classList.add("hidden");
       return;
     }
+
+    if (await checkBan(currentUser.id)) return;
 
     const name =
       currentUser.user_metadata?.full_name ||
@@ -314,10 +437,13 @@
   }
 
   async function loadBroadcasts() {
+    if (!currentUser) return;
+
     const { data, error } = await supabaseClient
       .from("broadcasts")
       .select("id,message,created_at")
       .eq("active", true)
+      .or("target_user_id.is.null,target_user_id.eq." + currentUser.id)
       .order("created_at", { ascending:false })
       .limit(10);
 
@@ -358,6 +484,7 @@
     if (!isAdmin) return;
 
     const message = document.getElementById("broadcastText").value.trim();
+    const target = document.getElementById("broadcastTarget").value;
     const status = document.getElementById("broadcastStatus");
 
     if (!message) {
@@ -365,14 +492,21 @@
       return;
     }
 
+    if (currentRole === "mod" && target !== "all") {
+      status.textContent = "Mods can only broadcast to everyone.";
+      return;
+    }
+
     status.textContent = "Sending...";
 
-    // RLS enforces admin access. The frontend does not grant itself permission.
-    const { error } = await supabaseClient.from("broadcasts").insert({
+    const row = {
       message,
-      created_by: currentUser.id,
-      active: true
-    });
+      admin_id: currentUser.id,
+      active: true,
+      target_user_id: target === "all" ? null : target
+    };
+
+    const { error } = await supabaseClient.from("broadcasts").insert(row);
 
     if (error) {
       status.textContent = error.message;
@@ -380,6 +514,7 @@
     }
 
     document.getElementById("broadcastText").value = "";
+    document.getElementById("broadcastTarget").value = "all";
     status.textContent = "Broadcast sent.";
     await loadBroadcasts();
     await refreshAdmin();
@@ -388,23 +523,63 @@
   async function refreshAdmin() {
     if (!isAdmin) return;
 
-    const [broadcasts, users, logs] = await Promise.all([
+    const [broadcasts, users, logs, bans, roles] = await Promise.all([
       supabaseClient.from("broadcasts")
-        .select("id,message,created_at,created_by,active")
-        .order("created_at", { ascending:false }).limit(50),
+        .select("id,message,created_at,created_by,active,target_user_id")
+        .order("created_at", { ascending:false }).limit(100),
 
       supabaseClient.from("profiles")
         .select("id,email,display_name,created_at")
-        .order("created_at", { ascending:false }).limit(100),
+        .order("created_at", { ascending:false }).limit(500),
 
       supabaseClient.from("admin_logs")
         .select("id,action,target_user,details,created_at")
-        .order("created_at", { ascending:false }).limit(100)
+        .order("created_at", { ascending:false }).limit(200),
+
+      supabaseClient.from("banned_users")
+        .select("user_id,reason,expires_at,active,created_at")
+        .eq("active", true),
+
+      supabaseClient.from("user_roles")
+        .select("user_id,role")
     ]);
 
+    cachedUsers = users.data || [];
+    cachedBans = bans.data || [];
+
     renderBroadcastAdmin(broadcasts.data || [], broadcasts.error);
-    renderUsers(users.data || [], users.error);
+    renderUsers(cachedUsers, users.error);
     renderLogs(logs.data || [], logs.error);
+    populateBroadcastTargets(cachedUsers);
+    updateStats(cachedUsers, cachedBans, roles.data || [], broadcasts.data || []);
+  }
+
+  function updateStats(users, bans, roles, broadcasts) {
+    document.getElementById("statUsers").textContent = users.length;
+    document.getElementById("statBanned").textContent = bans.length;
+    document.getElementById("statMods").textContent = roles.filter(r => r.role === "mod").length;
+    document.getElementById("statBroadcasts").textContent = broadcasts.length;
+  }
+
+  function populateBroadcastTargets(users) {
+    const select = document.getElementById("broadcastTarget");
+    const current = select.value || "all";
+    select.innerHTML = '<option value="all">Everyone</option>';
+
+    if (currentRole !== "mod") {
+      for (const u of users) {
+        const option = document.createElement("option");
+        option.value = u.id;
+        option.textContent = (u.email || u.display_name || u.id) + " — " + u.id.slice(0, 8);
+        select.appendChild(option);
+      }
+    }
+
+    select.value = [...select.options].some(o => o.value === current) ? current : "all";
+  }
+
+  function renderCurrentUsers() {
+    renderUsers(cachedUsers, null);
   }
 
   function renderBroadcastAdmin(rows, error) {
@@ -413,12 +588,15 @@
       el.textContent = error.message;
       return;
     }
-    el.innerHTML = rows.map(b =>
-      `<div class="row">
+    el.innerHTML = rows.map(b => {
+      const target = b.target_user_id ? "Specific user" : "Everyone";
+      return `<div class="row">
         <b>${escapeHtml(b.message)}</b>
+        <span class="badge">${escapeHtml(target)}</span>
         <div class="muted">${new Date(b.created_at).toLocaleString()}</div>
-      </div>`
-    ).join("") || '<div class="muted">No broadcasts.</div>';
+        ${currentRole !== "mod" ? `<div class="admin-row-actions"><button class="mini-action danger" onclick="deleteBroadcast('${b.id}')">Delete</button></div>` : ""}
+      </div>`;
+    }).join("") || '<div class="muted">No broadcasts.</div>';
   }
 
   function renderUsers(rows, error) {
@@ -427,13 +605,30 @@
       el.textContent = error.message;
       return;
     }
-    el.innerHTML = rows.map(u =>
-      `<div class="row">
+
+    const q = (document.getElementById("userSearch")?.value || "").trim().toLowerCase();
+    const filtered = rows.filter(u =>
+      !q ||
+      (u.email || "").toLowerCase().includes(q) ||
+      (u.display_name || "").toLowerCase().includes(q) ||
+      u.id.toLowerCase().includes(q)
+    );
+
+    el.innerHTML = filtered.map(u => {
+      const banned = cachedBans.find(b => b.user_id === u.id);
+      return `<div class="row">
         <b>${escapeHtml(u.display_name || "User")}</b>
+        ${banned ? '<span class="badge">BANNED</span>' : ""}
         <div>${escapeHtml(u.email || "")}</div>
-        <div class="muted">${u.id}</div>
-      </div>`
-    ).join("") || '<div class="muted">No users.</div>';
+        <div class="muted">${escapeHtml(u.id)}</div>
+        ${banned ? `<div class="muted">Reason: ${escapeHtml(banned.reason || "No reason")}</div>` : ""}
+        <div class="admin-row-actions">
+          <button class="mini-action" onclick="selectModerationUser('${u.id}')">Select</button>
+          ${currentRole !== "mod" && u.id !== currentUser.id && !banned ? `<button class="mini-action danger" onclick="quickBan('${u.id}')">Ban</button>` : ""}
+          ${currentRole !== "mod" && banned ? `<button class="mini-action" onclick="quickUnban('${u.id}')">Unban</button>` : ""}
+        </div>
+      </div>`;
+    }).join("") || '<div class="muted">No matching users.</div>';
   }
 
   function renderLogs(rows, error) {
@@ -445,9 +640,182 @@
     el.innerHTML = rows.map(l =>
       `<div class="row">
         <b>${escapeHtml(l.action)}</b>
-        <div class="muted">${new Date(l.created_at).toLocaleString()}</div>
+        <div>${escapeHtml(l.details || "")}</div>
+        <div class="muted">${escapeHtml(l.target_user || "")} · ${new Date(l.created_at).toLocaleString()}</div>
       </div>`
     ).join("") || '<div class="muted">No logs.</div>';
+  }
+
+  function showAdminTab(tab) {
+    const tabs = ["users", "broadcasts", "moderation", "logs", "chat", "tools"];
+    for (const name of tabs) {
+      document.getElementById("admin" + name.charAt(0).toUpperCase() + name.slice(1) + "Tab").classList.toggle("hidden", name !== tab);
+      const button = document.getElementById("tab" + name.charAt(0).toUpperCase() + name.slice(1));
+      if (button) button.classList.toggle("active", name === tab);
+    }
+  }
+
+  function selectModerationUser(id) {
+    document.getElementById("moderationUserId").value = id;
+    showAdminTab("moderation");
+  }
+
+  async function banSelectedUser() {
+    if (!["admin", "owner"].includes(currentRole)) return;
+    const userId = document.getElementById("moderationUserId").value.trim();
+    const reason = document.getElementById("banReason").value.trim();
+    const status = document.getElementById("moderationStatus");
+
+    if (!userId) { status.textContent = "Enter or select a user."; return; }
+    if (!reason) { status.textContent = "Enter a ban reason."; return; }
+    if (userId === currentUser.id) { status.textContent = "You cannot ban yourself."; return; }
+
+    status.textContent = "Banning...";
+    const { error } = await supabaseClient.from("banned_users").upsert({
+      user_id: userId,
+      reason,
+      banned_by: currentUser.id,
+      active: true
+    }, { onConflict: "user_id" });
+
+    if (error) { status.textContent = error.message; return; }
+
+    await writeClientLog("ban_user", userId, reason);
+    status.textContent = "User banned.";
+    await refreshAdmin();
+  }
+
+  async function unbanSelectedUser() {
+    if (!["admin", "owner"].includes(currentRole)) return;
+    const userId = document.getElementById("moderationUserId").value.trim();
+    const status = document.getElementById("moderationStatus");
+    if (!userId) { status.textContent = "Enter or select a user."; return; }
+
+    const { error } = await supabaseClient.from("banned_users")
+      .update({active:false})
+      .eq("user_id", userId);
+
+    if (error) { status.textContent = error.message; return; }
+
+    await writeClientLog("unban_user", userId, "Ban removed");
+    status.textContent = "User unbanned.";
+    await refreshAdmin();
+  }
+
+  async function quickBan(userId) {
+    selectModerationUser(userId);
+    document.getElementById("banReason").focus();
+  }
+
+  async function quickUnban(userId) {
+    document.getElementById("moderationUserId").value = userId;
+    await unbanSelectedUser();
+  }
+
+  async function addModerator() {
+    if (!["admin", "owner"].includes(currentRole)) return;
+    const userId = document.getElementById("modUserId").value.trim();
+    const status = document.getElementById("modStatus");
+    if (!userId) { status.textContent = "Enter a user ID."; return; }
+    if (userId === currentUser.id) { status.textContent = "You already have your current role."; return; }
+
+    const { error } = await supabaseClient.from("user_roles").upsert({
+      user_id: userId,
+      role: "mod"
+    }, { onConflict: "user_id" });
+
+    if (error) { status.textContent = error.message; return; }
+    await writeClientLog("add_mod", userId, "Moderator role added");
+    status.textContent = "Moderator added.";
+    await refreshAdmin();
+  }
+
+  async function removeModerator() {
+    if (!["admin", "owner"].includes(currentRole)) return;
+    const userId = document.getElementById("removeModUserId").value.trim();
+    const status = document.getElementById("modStatus");
+    if (!userId) { status.textContent = "Enter a moderator user ID."; return; }
+
+    const { error } = await supabaseClient.from("user_roles")
+      .delete()
+      .eq("user_id", userId)
+      .eq("role", "mod");
+
+    if (error) { status.textContent = error.message; return; }
+    await writeClientLog("remove_mod", userId, "Moderator role removed");
+    status.textContent = "Moderator removed.";
+    await refreshAdmin();
+  }
+
+  async function deleteBroadcast(id) {
+    if (!["admin", "owner"].includes(currentRole)) return;
+    const { error } = await supabaseClient.from("broadcasts")
+      .update({active:false})
+      .eq("id", id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await writeClientLog("delete_broadcast", id, "Broadcast deactivated");
+    await loadBroadcasts();
+    await refreshAdmin();
+  }
+
+  async function refreshChat() {
+    if (!isAdmin) return;
+    const el=document.getElementById("adminChatList");
+    const {data,error}=await supabaseClient.from("cosmos_chat")
+      .select("id,message,user_email,created_at")
+      .order("created_at",{ascending:false}).limit(200);
+    if(error){el.textContent=error.message;return;}
+    el.innerHTML=(data||[]).map(m=>`<div class="row">
+      <b>${escapeHtml(m.user_email||"User")}</b>
+      <div>${escapeHtml(m.message)}</div>
+      <div class="muted">${new Date(m.created_at).toLocaleString()}</div>
+      <div class="admin-row-actions"><button class="mini-action danger" onclick="deleteChatMessage('${m.id}')">Delete</button></div>
+    </div>`).join("") || '<div class="muted">No chat messages.</div>';
+  }
+
+  async function deleteChatMessage(id) {
+    if(!isAdmin) return;
+    const {error}=await supabaseClient.from("cosmos_chat").delete().eq("id",id);
+    if(error){alert(error.message);return;}
+    await writeClientLog("delete_chat_message", id, "Chat message deleted");
+    await refreshChat();
+  }
+
+  async function clearBroadcasts() {
+    if(!["admin","owner"].includes(currentRole)) return;
+    const {error}=await supabaseClient.from("broadcasts").update({active:false}).eq("active",true);
+    const status=document.getElementById("toolsStatus");
+    if(error){status.textContent=error.message;return;}
+    status.textContent="All active broadcasts were deactivated.";
+    await writeClientLog("clear_broadcasts", null, "All active broadcasts deactivated");
+    await refreshAdmin();
+  }
+
+  async function toggleMaintenance() {
+    if(!["admin","owner"].includes(currentRole)) return;
+    const status=document.getElementById("toolsStatus");
+    const {data,error}=await supabaseClient.from("site_settings").select("value").eq("key","maintenance").maybeSingle();
+    if(error){status.textContent=error.message;return;}
+    const next = data?.value !== "true";
+    const result=await supabaseClient.from("site_settings").upsert({key:"maintenance",value:String(next)},{onConflict:"key"});
+    if(result.error){status.textContent=result.error.message;return;}
+    status.textContent="Maintenance mode: "+(next?"ON":"OFF");
+    await writeClientLog("maintenance_mode", null, String(next));
+  }
+
+  async function writeClientLog(action, targetUser, details) {
+    const { error } = await supabaseClient.from("admin_logs").insert({
+      action,
+      target_user: targetUser,
+      details,
+      admin_id: currentUser.id
+    });
+    if (error) console.error("Could not write admin log:", error);
   }
 
   function escapeHtml(value) {
@@ -463,53 +831,298 @@
     const input = document.getElementById('pageInput');
     let url = input.value.trim();
     if (!url) { input.style.borderColor = "#f00"; return; }
+    input.style.borderColor = "#222";
     if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
 
     const popup = window.open('about:blank', 'CosmosSession', 'width=1280,height=720');
-    if (!popup) return;
+    if (!popup) {
+      alert("The Cosmos popup was blocked. Allow popups for this site and try again.");
+      return;
+    }
 
+    popup.document.open();
     popup.document.write(`
       <!DOCTYPE html><html><head><title>Cosmos Session</title>
       <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap" rel="stylesheet">
       <style>
-        body,html{margin:0;padding:0;height:100%;overflow:hidden;background:#000;font-family:'Comfortaa',cursive;color:#fff}
+        html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#000;font-family:'Comfortaa',cursive;color:#fff}
         #view-container{width:100%;height:100%;position:relative}
-        iframe{width:100%;height:100%;border:none;background:#fff;position:absolute;top:0;left:0;display:none}
+        iframe{width:100%;height:100%;border:none;background:#fff;position:absolute;inset:0;display:none}
         iframe.active{display:block}
-        #ghostTrigger{position:fixed;top:15px;right:15px;width:40px;height:40px;background:rgba(255,255,255,.1);border-radius:12px;z-index:10005;cursor:pointer;display:flex;align-items:center;justify-content:center}
-        .dot{width:4px;height:4px;background:#fff;border-radius:50%;margin:0 1px}
-        #panel{position:fixed;top:0;right:-400px;width:350px;height:100%;background:rgba(10,10,10,.98);transition:.5s cubic-bezier(.16,1,.3,1);z-index:10001;padding:25px;box-sizing:border-box;display:flex;flex-direction:column;backdrop-filter:blur(20px);border-left:1px solid #222}
-        #panel.open{transform:translateX(-400px)}
+        #ghostTrigger{position:fixed;top:15px;right:15px;width:46px;height:46px;background:rgba(18,18,18,.94);border:1px solid #333;border-radius:13px;z-index:2147483647;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;box-shadow:0 8px 25px rgba(0,0,0,.45);user-select:none}
+        #ghostTrigger:hover{background:#222}
+        .dot{width:4px;height:4px;background:#fff;border-radius:50%}
+        #panel{position:fixed;top:0;right:0;width:350px;max-width:90vw;height:100%;background:rgba(10,10,10,.98);transition:transform .28s cubic-bezier(.16,1,.3,1);transform:translateX(100%);z-index:2147483646;padding:25px;box-sizing:border-box;display:flex;flex-direction:column;backdrop-filter:blur(20px);border-left:1px solid #222}
+        #broadcastsBox{display:none;position:absolute;inset:0;background:#0a0a0a;padding:25px;box-sizing:border-box;z-index:4;overflow:auto}
+        #broadcastsBox.open{display:block}
+        #broadcastToast{position:fixed;left:18px;bottom:18px;max-width:360px;background:rgba(12,12,12,.97);border:1px solid #333;border-radius:14px;padding:13px 16px;z-index:2147483645;box-shadow:0 10px 35px rgba(0,0,0,.5);display:none;font-size:.78rem}
+        #chatBox{display:none;position:absolute;inset:0;background:#0a0a0a;padding:25px;box-sizing:border-box;z-index:4}
+        #chatBox.open{display:flex;flex-direction:column}
+        #chatMessages{flex:1;overflow:auto;margin:12px 0;border:1px solid #222;border-radius:14px;padding:10px}
+        .chat-msg{padding:8px 4px;border-bottom:1px solid #181818;font-size:.74rem}
+        .chat-name{font-weight:700}
+        .chat-form{display:flex;gap:7px}
+        .chat-form input{margin:0;flex:1}
+        .chat-form button{width:auto;padding:10px 14px;margin:0}
+        #panel.open{transform:translateX(0)}
         #tab-list{margin:15px 0;max-height:400px;overflow-y:auto}
         .tab-item{background:#111;padding:12px 15px;border-radius:12px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.75rem;border:1px solid #222}
         .tab-item.active{border-color:#555;background:#1a1a1a}
         .tab-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
-        .close-x{color:#555;font-weight:bold;padding:0 5px}
+        .close-x{color:#777;font-weight:bold;padding:0 5px}
         input{background:#151515;border:1px solid #222;color:#fff;padding:12px 20px;border-radius:100px;outline:none;width:100%;box-sizing:border-box;margin-bottom:10px}
-        .btn{padding:12px;background:#1a1a1a;color:#fff;border:none;border-radius:100px;cursor:pointer;font-weight:700;width:100%;margin-bottom:10px}
-        .btn:hover{background:#fff;color:#000}.label{font-size:.7rem;color:#555;text-transform:uppercase;margin:15px 0 5px 5px;letter-spacing:1px}
+        .btn{padding:12px;background:#1a1a1a;color:#fff;border:none;border-radius:100px;cursor:pointer;font-weight:700;width:100%;margin-bottom:10px;font-family:inherit}
+        .btn:hover{background:#fff;color:#000}
+        .label{font-size:.7rem;color:#555;text-transform:uppercase;margin:15px 0 5px 5px;letter-spacing:1px}
       </style></head><body>
-      <div id="ghostTrigger" onclick="t()"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
-      <div id="panel"><div style="font-weight:700;font-size:1.5rem;margin-bottom:20px">Cosmos</div>
-      <input id="n" type="text" placeholder="destination..."><button class="btn" onclick="addTab()">+ New Tab</button>
-      <div class="label">Quick Links</div><button class="btn" onclick="addTab('https://web.cloudmoonapp.com/')">CloudMoon</button>
-      <div class="label">Open Tabs</div><div id="tab-list"></div>
-      <div class="label">Settings</div><button id="fixBtn" class="btn" onclick="toggleFix()">CloudMoon Fix: OFF</button>
-      <div style="margin-top:auto"><button class="btn" style="background:#300;color:#f55" onclick="window.close()">Kill Session</button></div></div>
+      <button id="ghostTrigger" aria-label="Open Cosmos menu" title="Open Cosmos menu">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      </button>
+      <div id="panel">
+        <div style="font-weight:700;font-size:1.5rem;margin-bottom:20px">Cosmos</div>
+        <input id="n" type="text" placeholder="destination...">
+        <button id="newTabBtn" class="btn">+ New Tab</button>
+        <div class="label">Quick Links</div>
+        <button id="cloudmoonBtn" class="btn">CloudMoon</button>
+        <button id="broadcastsBtn" class="btn">Broadcasts</button>
+        <button id="chatBtn" class="btn">Live Chat</button>
+        <div class="label">Open Tabs</div><div id="tab-list"></div>
+        <div class="label">Settings</div>
+        <button id="fixBtn" class="btn">CloudMoon Fix: OFF</button>
+        <div style="margin-top:auto"><button id="killBtn" class="btn" style="background:#300;color:#f55">Kill Session</button></div>
+      </div>
+      <div id="broadcastsBox">
+        <button id="closeBroadcasts" class="btn">← Back</button>
+        <div style="font-weight:700;font-size:1.2rem">Broadcasts</div>
+        <div id="broadcastList" style="margin-top:15px"></div>
+      </div>
+      <div id="chatBox">
+        <button id="closeChat" class="btn">← Back</button>
+        <div style="font-weight:700;font-size:1.2rem">Live Chat</div>
+        <div id="chatMessages"></div>
+        <div class="chat-form">
+          <input id="chatInput" maxlength="500" placeholder="Message...">
+          <button id="chatSend" class="btn">Send</button>
+        </div>
+      </div>
+      <div id="broadcastToast"></div>
       <div id="view-container"></div>
       <script>
-        let tabs=[],activeIndex=-1,fixEnabled=false;
-        const container=document.getElementById('view-container'),list=document.getElementById('tab-list'),n=document.getElementById('n'),fixBtn=document.getElementById('fixBtn');
-        function t(){document.getElementById('panel').classList.toggle('open')}
-        function getFriendlyName(url){try{let name=url.replace(/^https?:\/\//i,'').split('/')[0];if(name.includes('cloudmoon'))return'CloudMoon';return name.charAt(0).toUpperCase()+name.slice(1)}catch(e){return'New Tab'}}
-        function addTab(url=n.value){if(!url)return;if(!/^https?:\/\//i.test(url))url='https://'+url;const id='frame-'+Date.now();const ifr=document.createElement('iframe');ifr.id=id;ifr.src=url;updateFrameSandbox(ifr);ifr.onload=()=>{const index=tabs.findIndex(t=>t.id===id);if(index!==-1){tabs[index].name=getFriendlyName(ifr.src);renderTabs()}};container.appendChild(ifr);tabs.push({id,url,name:getFriendlyName(url)});n.value='';switchTab(tabs.length-1)}
-        function switchTab(index){if(index<0)return;activeIndex=index;container.querySelectorAll('iframe').forEach((f,i)=>f.classList.toggle('active',i===index));renderTabs()}
-        function closeTab(e,index){e.stopPropagation();const tab=tabs[index];document.getElementById(tab.id).remove();tabs.splice(index,1);if(tabs.length===0)activeIndex=-1;else if(activeIndex>=index)activeIndex=Math.max(0,activeIndex-1);renderTabs();if(activeIndex!==-1)switchTab(activeIndex)}
-        function renderTabs(){list.innerHTML='';tabs.forEach((tab,i)=>{const item=document.createElement('div');item.className='tab-item'+(i===activeIndex?' active':'');item.innerHTML='<span>'+tab.name+'</span><div class="close-x" onclick="closeTab(event,'+i+')">×</div>';item.onclick=()=>switchTab(i);list.appendChild(item)})}
-        function updateFrameSandbox(ifr){if(fixEnabled)ifr.setAttribute('sandbox','allow-forms allow-scripts allow-same-origin');else ifr.removeAttribute('sandbox')}
-        function toggleFix(){fixEnabled=!fixEnabled;fixBtn.innerText='CloudMoon Fix: '+(fixEnabled?'ON':'OFF');fixBtn.style.background=fixEnabled?'#fff':'#1a1a1a';fixBtn.style.color=fixEnabled?'#000':'#fff';container.querySelectorAll('iframe').forEach(f=>{updateFrameSandbox(f);const src=f.src;f.src='about:blank';setTimeout(()=>{f.src=src},50)})}
-        addTab(${JSON.stringify(url)});
-        n.addEventListener('keypress',e=>{if(e.key==='Enter')addTab()});
+        (() => {
+          let tabs=[], activeIndex=-1, fixEnabled=false;
+          const container=document.getElementById('view-container');
+          const list=document.getElementById('tab-list');
+          const n=document.getElementById('n');
+          const fixBtn=document.getElementById('fixBtn');
+          const panel=document.getElementById('panel');
+          const ghost=document.getElementById('ghostTrigger');
+
+          function toggleMenu(){ panel.classList.toggle('open'); }
+          ghost.addEventListener('click', toggleMenu);
+
+          function getFriendlyName(url){
+            try{
+              const name=url.replace(/^https?:\/\//i,'').split('/')[0];
+              if(name.includes('cloudmoon')) return 'CloudMoon';
+              return name.charAt(0).toUpperCase()+name.slice(1);
+            }catch(e){return 'New Tab'}
+          }
+
+          function updateFrameSandbox(ifr){
+            if(fixEnabled) ifr.setAttribute('sandbox','allow-forms allow-scripts allow-same-origin');
+            else ifr.removeAttribute('sandbox');
+          }
+
+          function addTab(rawUrl){
+            let tabUrl=(rawUrl ?? n.value).trim();
+            if(!tabUrl) return;
+            if(!/^https?:\/\//i.test(tabUrl)) tabUrl='https://'+tabUrl;
+
+            const id='frame-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+            const ifr=document.createElement('iframe');
+            ifr.id=id;
+            ifr.src=tabUrl;
+            updateFrameSandbox(ifr);
+            ifr.onload=()=>{
+              const index=tabs.findIndex(t=>t.id===id);
+              if(index!==-1){
+                tabs[index].name=getFriendlyName(tabUrl);
+                renderTabs();
+              }
+            };
+            container.appendChild(ifr);
+            tabs.push({id,url:tabUrl,name:getFriendlyName(tabUrl)});
+            n.value='';
+            switchTab(tabs.length-1);
+          }
+
+          function switchTab(index){
+            if(index<0 || index>=tabs.length) return;
+            activeIndex=index;
+            container.querySelectorAll('iframe').forEach((f,i)=>f.classList.toggle('active',i===index));
+            renderTabs();
+          }
+
+          function closeTab(index){
+            const tab=tabs[index];
+            if(!tab) return;
+            const frame=document.getElementById(tab.id);
+            if(frame) frame.remove();
+            tabs.splice(index,1);
+            if(tabs.length===0) activeIndex=-1;
+            else if(activeIndex>index) activeIndex--;
+            else if(activeIndex>=tabs.length) activeIndex=tabs.length-1;
+            renderTabs();
+            if(activeIndex!==-1) switchTab(activeIndex);
+          }
+
+          function renderTabs(){
+            list.replaceChildren();
+            tabs.forEach((tab,i)=>{
+              const item=document.createElement('div');
+              item.className='tab-item'+(i===activeIndex?' active':'');
+              const name=document.createElement('span');
+              name.textContent=tab.name;
+              const close=document.createElement('div');
+              close.className='close-x';
+              close.textContent='×';
+              close.addEventListener('click',(e)=>{e.stopPropagation();closeTab(i);});
+              item.append(name,close);
+              item.addEventListener('click',()=>switchTab(i));
+              list.appendChild(item);
+            });
+          }
+
+          function toggleFix(){
+            fixEnabled=!fixEnabled;
+            fixBtn.textContent='CloudMoon Fix: '+(fixEnabled?'ON':'OFF');
+            fixBtn.style.background=fixEnabled?'#fff':'#1a1a1a';
+            fixBtn.style.color=fixEnabled?'#000':'#fff';
+            container.querySelectorAll('iframe').forEach(f=>{
+              updateFrameSandbox(f);
+              const src=f.src;
+              f.src='about:blank';
+              setTimeout(()=>{f.src=src},50);
+            });
+          }
+
+          const broadcastsBox=document.getElementById('broadcastsBox');
+          const chatBox=document.getElementById('chatBox');
+          const toast=document.getElementById('broadcastToast');
+          const broadcastList=document.getElementById('broadcastList');
+          const chatMessages=document.getElementById('chatMessages');
+          const chatInput=document.getElementById('chatInput');
+
+          function openOverlay(box){ panel.classList.remove('open'); box.classList.add('open'); }
+          function closeOverlay(box){ box.classList.remove('open'); panel.classList.add('open'); }
+
+          function showBroadcast(message){
+            toast.textContent=message;
+            toast.style.display='block';
+            clearTimeout(window.__broadcastTimer);
+            window.__broadcastTimer=setTimeout(()=>toast.style.display='none',5000);
+          }
+
+          function renderBroadcasts(items){
+            broadcastList.replaceChildren();
+            if(!items.length){
+              broadcastList.textContent='No broadcasts yet.';
+              return;
+            }
+            items.forEach(item=>{
+              const row=document.createElement('div');
+              row.style.cssText='padding:12px 0;border-bottom:1px solid #222;font-size:.75rem';
+              const msg=document.createElement('div');
+              msg.textContent=item.message;
+              const time=document.createElement('div');
+              time.style.cssText='color:#666;margin-top:5px';
+              time.textContent=new Date(item.created_at).toLocaleString();
+              row.append(msg,time);
+              broadcastList.appendChild(row);
+            });
+          }
+
+          async function loadCosmosBroadcasts(){
+            try{
+              if(!window.opener || !window.opener.supabaseClient) return;
+              const sb=window.opener.supabaseClient;
+              const session=(await sb.auth.getSession()).data.session;
+              if(!session) return;
+              const result=await sb.from('broadcasts')
+                .select('id,message,created_at')
+                .eq('active',true)
+                .or('target_user_id.is.null,target_user_id.eq.'+session.user.id)
+                .order('created_at',{ascending:false}).limit(50);
+              if(result.error) return;
+              renderBroadcasts(result.data||[]);
+              const newest=result.data?.[0];
+              if(newest && !window.__lastBroadcastId){
+                window.__lastBroadcastId=newest.id;
+              }else if(newest && newest.id!==window.__lastBroadcastId){
+                window.__lastBroadcastId=newest.id;
+                showBroadcast(newest.message);
+              }
+            }catch(e){ console.error('Broadcast load failed',e); }
+          }
+
+          async function loadChat(){
+            try{
+              if(!window.opener || !window.opener.supabaseClient) return;
+              const sb=window.opener.supabaseClient;
+              const result=await sb.from('cosmos_chat')
+                .select('id,message,user_email,created_at')
+                .order('created_at',{ascending:true}).limit(100);
+              if(result.error) return;
+              chatMessages.replaceChildren();
+              (result.data||[]).forEach(item=>{
+                const row=document.createElement('div');
+                row.className='chat-msg';
+                const name=document.createElement('span');
+                name.className='chat-name';
+                name.textContent=(item.user_email||'User')+': ';
+                const msg=document.createElement('span');
+                msg.textContent=item.message;
+                row.append(name,msg);
+                chatMessages.appendChild(row);
+              });
+              chatMessages.scrollTop=chatMessages.scrollHeight;
+            }catch(e){ console.error('Chat load failed',e); }
+          }
+
+          async function sendChat(){
+            const message=chatInput.value.trim();
+            if(!message) return;
+            try{
+              const sb=window.opener?.supabaseClient;
+              const session=(await sb.auth.getSession()).data.session;
+              if(!session) return;
+              const result=await sb.from('cosmos_chat').insert({
+                user_id:session.user.id,
+                user_email:session.user.email,
+                message
+              });
+              if(result.error){ alert(result.error.message); return; }
+              chatInput.value='';
+              await loadChat();
+            }catch(e){ alert(e.message||e); }
+          }
+
+          document.getElementById('newTabBtn').addEventListener('click',()=>addTab());
+          document.getElementById('cloudmoonBtn').addEventListener('click',()=>addTab('https://web.cloudmoonapp.com/'));
+          document.getElementById('broadcastsBtn').addEventListener('click',()=>openOverlay(broadcastsBox));
+          document.getElementById('closeBroadcasts').addEventListener('click',()=>closeOverlay(broadcastsBox));
+          document.getElementById('chatBtn').addEventListener('click',()=>{openOverlay(chatBox);loadChat();});
+          document.getElementById('closeChat').addEventListener('click',()=>closeOverlay(chatBox));
+          document.getElementById('chatSend').addEventListener('click',sendChat);
+          chatInput.addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
+          document.getElementById('fixBtn').addEventListener('click',toggleFix);
+          document.getElementById('killBtn').addEventListener('click',()=>popup.close());
+          n.addEventListener('keydown',e=>{if(e.key==='Enter') addTab();});
+
+          loadCosmosBroadcasts();
+          setInterval(loadCosmosBroadcasts,5000);
+          addTab(${JSON.stringify(url)});
+        })();
       <\/script></body></html>
     `);
     popup.document.close();
