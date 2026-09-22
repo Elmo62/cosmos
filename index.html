@@ -3633,50 +3633,21 @@ function openSession() {
   const safeInitialUrl = JSON.stringify(url);
   const safeUserId = JSON.stringify(currentUser?.id || null);
 
-  // Build the full popup HTML as before (unchanged content),
-  // but load it via a Blob URL instead of document.write
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
-...same content as before, unchanged...
-  addTab(${safeInitialUrl});
-  syncPresence();
-  setInterval(syncPresence, 10000);
-})();
-<\/script>
-</body>
-</html>
-  `;
-
-  const blob = new Blob([html], { type: "text/html" });
-  const blobUrl = URL.createObjectURL(blob);
-
-  const popup = window.open(blobUrl, "CosmosSession", "width=1280,height=720");
+  const popup = window.open(
+    "about:blank",
+    "CosmosSession",
+    "width=1280,height=720,resizable=yes,scrollbars=no"
+  );
 
   if (!popup) {
-    alert("The Cosmos popup was blocked. Allow popups for this site and try again.");
-    URL.revokeObjectURL(blobUrl);
+    alert(
+      "The Cosmos popup was blocked. Allow popups for this site and try again."
+    );
     return;
   }
 
-  // Release the blob once the popup has loaded it
-  popup.addEventListener("load", () => {
-    URL.revokeObjectURL(blobUrl);
-  });
-}
+  popup.document.open();
 
-
-    const safeInitialUrl =
-      JSON.stringify(url);
-
-
-    const safeUserId =
-      JSON.stringify(
-        currentUser?.id || null
-      );
-
-
-    popup.document.open();
 
 
     popup.document.write(`
