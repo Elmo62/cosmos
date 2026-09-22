@@ -303,41 +303,58 @@
 
   const COSMOS_PROFILE = { firstName: "Drake", lastName: "Henry", graduationYear: 2031 };\n  let currentUser = null;
     await loadCosmosNicknames();
-  let cosmosNicknames = {};
+let cosmosNicknames = {};
 
-  async function loadCosmosNicknames() {
-    try {
-      const { data, error } = await supabaseClient
-        .from("cosmos_nicknames")
-        .select("user_id,nickname");
-      if (error) throw error;
-      cosmosNicknames = Object.fromEntries((data || []).map(r => [r.user_id, r.nickname]));
-    } catch (e) {
-      console.error("Nickname load failed:", e);
-      cosmosNicknames = {};
-    }
+async function loadCosmosNicknames() {
+  try {
+    const { data, error } = await supabaseClient
+      .from("cosmos_nicknames")
+      .select("user_id,nickname");
+    if (error) throw error;
+    cosmosNicknames = Object.fromEntries((data || []).map(r => [r.user_id, r.nickname]));
+  } catch (e) {
+    console.error("Nickname load failed:", e);
+    cosmosNicknames = {};
   }
+}
 
-  function getCosmosNickname(userId, fallback = "User") {
-    return (cosmosNicknames[userId] || fallback).trim() || fallback;
-  }
+function getCosmosNickname(userId, fallback = "User") {
+  const value = (cosmosNicknames[userId] || "").trim();
+  return value || fallback;
+}
 
-  async function setCosmosNickname(userId, nickname) {
-    const value = String(nickname || "").trim();
-    if (!value) {
-      const { error } = await supabaseClient
-        .from("cosmos_nicknames")
-        .delete()
-        .eq("user_id", userId);
-      if (error) throw error;
-    } else {
-      const { error } = await supabaseClient
-        .from("cosmos_nicknames")
-        .upsert({ user_id: userId, nickname: value }, { onConflict: "user_id" });
-      if (error) throw error;
-    }
-    await loadCosmosNicknames();
+async function setCosmosNickname(userId, nickname) {
+  const value = String(nickname || "").trim();
+  if (!value) {
+    const { error } = await supabaseClient
+      .from("cosmos_nicknames")
+      .delete()
+      .eq("user_id", userId);
+    if (error) throw error;
+  } else {
+    const { error } = await supabaseClient
+      .from("cosmos_nicknames")
+      .upsert({ user_id: userId, nickname: value }, { onConflict: "user_id" });
+    if (error) throw error;
   }
+  await loadCosmosNicknames();
+}
+
+async function promptNickname(userId, email) {
+  const current = cosmosNicknames[userId] || "";
+  const nickname = window.prompt(
+    "Nickname for " + email + " (leave blank to clear):",
+    current
+  );
+  if (nickname === null) return;
+  try {
+    await setCosmosNickname(userId, nickname);
+    if (typeof refreshAdmin === "function") await refreshAdmin();
+  } catch (e) {
+    alert("Could not save nickname: " + (e.message || e));
+  }
+}
+
   let currentRole = null;
   let isAdmin = false;
   let cachedUsers = [];
@@ -773,18 +790,6 @@
     }).join("") || '<div class="muted">No broadcasts.</div>';
   }
 
-  async function promptNickname(userId, email) {
-    const current = cosmosNicknames[userId] || "";
-    const nickname = window.prompt("Nickname for " + email + " (leave blank to clear):", current);
-    if (nickname === null) return;
-    try {
-      await setCosmosNickname(userId, nickname);
-      if (typeof refreshAdmin === "function") await refreshAdmin();
-    } catch (e) {
-      alert("Could not save nickname: " + (e.message || e));
-    }
-  }
-
   function renderUsers(rows, error) {
     const el = document.getElementById("userList");
     if (error) {
@@ -840,7 +845,7 @@
 
         ${gamesHtml}
         ${banned ? `<div class="muted">Reason: ${escapeHtml(banned.reason || "No reason")}</div>` : ""}
-        <div class="admin-row-actions">
+        <div class="admin-row-actions"><button class="mini-action" onclick="promptNickname('${u.id}', '${String(u.email || "").replace(/'/g, "\\'")}')">Nickname</button>
           <button class="mini-action" onclick="selectModerationUser('${u.id}')">Select</button>
           ${currentRole !== "mod" && u.id !== currentUser.id && !banned ? `<button class="mini-action danger" onclick="quickBan('${u.id}')">Ban</button>` : ""}
           ${currentRole !== "mod" && banned ? `<button class="mini-action" onclick="quickUnban('${u.id}')">Unban</button>` : ""}
