@@ -3713,6 +3713,8 @@
       width: 100%;
       height: 100%;
       position: relative;
+      z-index: 0;
+      isolation: isolate;
     }
 
     iframe {
@@ -3723,6 +3725,7 @@
       position: absolute;
       inset: 0;
       display: none;
+      z-index: 0;
     }
 
     iframe.active {
@@ -3746,6 +3749,7 @@
       border-radius: 13px;
 
       z-index: 2147483647;
+      pointer-events: auto;
 
       cursor: pointer;
 
@@ -3801,6 +3805,7 @@
         translateX(100%);
 
       z-index: 2147483646;
+      pointer-events: none;
 
       padding: 25px;
 
@@ -3818,6 +3823,7 @@
     #panel.open {
       transform:
         translateX(0);
+      pointer-events: auto;
     }
 
     #broadcastsBox {
@@ -4357,49 +4363,55 @@
      MENU
   ===================================================== */
 
+  ghost.setAttribute(
+    "aria-expanded",
+    "false"
+  );
+
+  panel.setAttribute(
+    "aria-hidden",
+    "true"
+  );
+
+
   function setMenuOpen(open) {
+    const isOpen = !!open;
 
     panel.classList.toggle(
       "open",
-      !!open
+      isOpen
     );
 
     ghost.setAttribute(
       "aria-expanded",
-      open
+      isOpen
         ? "true"
         : "false"
     );
-  }
 
-
-  function toggleMenu(event) {
-
-    if (event) {
-
-      event.preventDefault();
-
-      event.stopPropagation();
-
-      if (
-        event.stopImmediatePropagation
-      ) {
-        event.stopImmediatePropagation();
-      }
-    }
-
-
-    setMenuOpen(
-      !panel.classList.contains(
-        "open"
-      )
+    panel.setAttribute(
+      "aria-hidden",
+      isOpen
+        ? "false"
+        : "true"
     );
   }
 
 
   ghost.addEventListener(
-    "pointerdown",
-    toggleMenu,
+    "click",
+    function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (event.stopImmediatePropagation) {
+        event.stopImmediatePropagation();
+      }
+
+      setMenuOpen(
+        !panel.classList.contains("open")
+      );
+    },
     {
       capture: true
     }
@@ -4407,21 +4419,16 @@
 
 
   ghost.addEventListener(
-    "click",
+    "keydown",
     function (event) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        event.stopPropagation();
 
-      event.preventDefault();
-
-      event.stopPropagation();
-
-      if (
-        event.stopImmediatePropagation
-      ) {
-        event.stopImmediatePropagation();
+        setMenuOpen(
+          !panel.classList.contains("open")
+        );
       }
-    },
-    {
-      capture: true
     }
   );
 
@@ -4997,9 +5004,7 @@
     box
   ) {
 
-    panel.classList.remove(
-      "open"
-    );
+    setMenuOpen(false);
 
     box.classList.add(
       "open"
@@ -5413,16 +5418,23 @@
   document.addEventListener(
     "pointerdown",
     function (event) {
-
       if (
-        !panel.contains(
-          event.target
-        ) &&
-        !ghost.contains(
-          event.target
-        )
+        !panel.contains(event.target) &&
+        !ghost.contains(event.target)
       ) {
+        setMenuOpen(false);
+      }
+    }
+  );
 
+
+  document.addEventListener(
+    "keydown",
+    function (event) {
+      if (
+        event.key === "Escape" &&
+        panel.classList.contains("open")
+      ) {
         setMenuOpen(false);
       }
     }
