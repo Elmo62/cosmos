@@ -603,7 +603,7 @@
   async function refreshAdmin() {
     if (!isAdmin) return;
 
-    const [broadcasts, users, logs, bans, roles] = await Promise.all([
+    const [broadcasts, users, logs, bans, roles, presence] = await Promise.all([
       supabaseClient.from("broadcasts")
         .select("id,message,created_at,active,target_user_id")
         .order("created_at", { ascending:false }).limit(100),
@@ -631,7 +631,23 @@
     cachedBans = bans.data || [];
     cachedPresence = new Map();
     for (const p of (presence.data || [])) {
-      cachedPresence.set(p.user_id, p);
+      const existing = cachedPresence.get(p.user_id);
+      if (!existing) {
+        cachedPresence.set(p.user_id, {
+          user_id: p.user_id,
+          sessions: [p],
+          tabs: Array.isArray(p.tabs) ? p.tabs : [],
+          active_tab: p.active_tab,
+          last_seen: p.last_seen
+        });
+      } else {
+        existing.sessions.push(p);
+        existing.tabs.push(...(Array.isArray(p.tabs) ? p.tabs : []));
+        if (new Date(p.last_seen) > new Date(existing.last_seen)) {
+          existing.last_seen = p.last_seen;
+          existing.active_tab = p.active_tab;
+        }
+      }
     }
 
     renderBroadcastAdmin(broadcasts.data || [], broadcasts.error);
@@ -676,10 +692,28 @@
       .select("user_id,session_id,tabs,active_tab,last_seen");
     if (!error) {
       cachedPresence = new Map();
-      for (const p of (data || [])) cachedPresence.set(p.user_id, p);
+      for (const p of (data || [])) {
+        const existing = cachedPresence.get(p.user_id);
+        if (!existing) {
+          cachedPresence.set(p.user_id, {
+            user_id: p.user_id,
+            sessions: [p],
+            tabs: Array.isArray(p.tabs) ? p.tabs : [],
+            active_tab: p.active_tab,
+            last_seen: p.last_seen
+          });
+        } else {
+          existing.sessions.push(p);
+          existing.tabs.push(...(Array.isArray(p.tabs) ? p.tabs : []));
+          if (new Date(p.last_seen) > new Date(existing.last_seen)) {
+            existing.last_seen = p.last_seen;
+            existing.active_tab = p.active_tab;
+          }
+        }
+      }
       renderCurrentUsers();
     }
-  }, 15000);
+  }, 10000);
 
   function renderBroadcastAdmin(rows, error) {
     const el = document.getElementById("adminBroadcastList");
@@ -940,13 +974,16 @@
   }
 
   async function writeClientLog(action, targetUser, details) {
-    const { error } = await supabaseClient.from("admin_logs").insert({
-      action,
-      target_user: targetUser,
-      details,
-      admin_id: currentUser.id
-    });
-    if (error) console.error("Could not write admin log:", error);
+    try {
+      const { error } = await supabaseClient.rpc("cosmos_write_admin_log", {
+        p_action: action,
+        p_target_user: targetUser,
+        p_details: typeof details === "string" ? { message: details } : (details || {})
+      });
+      if (error) console.error("Could not write admin log:", error);
+    } catch (e) {
+      console.error("Could not write admin log:", e);
+    }
   }
 
   function escapeHtml(value) {
@@ -1006,11 +1043,11 @@
         .btn:hover{background:#fff;color:#000}
         .label{font-size:.7rem;color:#555;text-transform:uppercase;margin:15px 0 5px 5px;letter-spacing:1px}
       </style></head><body>
-      <button id="ghostTrigger" aria-label="Open Cosmos menu" title="Open Cosmos menu">
+      <button id="ghostTrigger" aria-label="Open Cosmos menu" title="Open side menu">
         <span class="dot"></span><span class="dot"></span><span class="dot"></span>
       </button>
       <div id="panel">
-        <div style="font-weight:700;font-size:1.5rem;margin-bottom:20px">Cosmos</div>
+        <div style="font-weight:700;font-size:1.5rem;margin-bottom:6px">Cosmos</div><div style="font-size:.7rem;color:#666;margin-bottom:18px">Side Menu</div>
         <input id="n" type="text" placeholder="destination...">
         <button id="newTabBtn" class="btn">+ New Tab</button>
         <div class="label">Quick Links</div>
@@ -1289,9 +1326,10 @@
 
           loadCosmosBroadcasts();
           setInterval(loadCosmosBroadcasts,5000);
+          // Load the URL entered on the main Cosmos page directly into the first iframe tab.
           addTab(${JSON.stringify(url)});
           syncPresence();
-          setInterval(syncPresence,15000);
+          setInterval(syncPresence,10000);
         })();
       <\/script></body></html>
     `);
