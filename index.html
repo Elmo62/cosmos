@@ -117,7 +117,7 @@
 
 <script>
   // Replace these two values with your Supabase project's values.
-  const SUPABASE_URL = https://upectdowijoigawmvnyc.supabase.co";
+  const SUPABASE_URL = "https://upectdowijoigawmvnyc.supabase.co";
   const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_uT9X8XD4bmHEbZMlYMT-Lg_zZ29CcY0";
 
   const supabaseClient = window.supabase.createClient(
@@ -178,7 +178,7 @@
     const { error } = await supabaseClient.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: window.location.origin
+        redirectTo: "https://elmo62.github.io/cosmos/"
       }
     });
 
