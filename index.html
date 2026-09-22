@@ -82,7 +82,7 @@
     .admin-section-wide { grid-column:1 / -1; }
     .admin-field { width:100%; padding:11px 13px; background:#151515; border:1px solid #252525; color:#fff; border-radius:12px; outline:none; font-family:inherit; margin-top:8px; }
     .admin-select { width:100%; padding:11px 13px; background:#151515; border:1px solid #252525; color:#fff; border-radius:12px; outline:none; font-family:inherit; margin-top:8px; }
-    .admin-row-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
+    .admin-row-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
     .mini-action { padding:7px 10px; border:1px solid #292929; border-radius:999px; background:#151515; color:#fff; cursor:pointer; font:inherit; font-size:.72rem; }
     .mini-action:hover { background:#fff; color:#000; }
     .mini-action.danger { color:#ff7777; }
@@ -525,7 +525,7 @@
 
     const [broadcasts, users, logs, bans, roles] = await Promise.all([
       supabaseClient.from("broadcasts")
-        .select("id,message,created_at,created_by,active,target_user_id")
+        .select("id,message,created_at,active,target_user_id")
         .order("created_at", { ascending:false }).limit(100),
 
       supabaseClient.from("profiles")
@@ -616,10 +616,13 @@
 
     el.innerHTML = filtered.map(u => {
       const banned = cachedBans.find(b => b.user_id === u.id);
+      const displayName = (u.display_name || "").trim();
+      const email = (u.email || "").trim();
+      const showName = displayName && displayName.toLowerCase() !== email.toLowerCase();
       return `<div class="row">
-        <b>${escapeHtml(u.display_name || "User")}</b>
+        ${showName ? `<b>${escapeHtml(displayName)}</b>` : ""}
         ${banned ? '<span class="badge">BANNED</span>' : ""}
-        <div>${escapeHtml(u.email || "")}</div>
+        ${email ? `<div>${escapeHtml(email)}</div>` : ""}
         <div class="muted">${escapeHtml(u.id)}</div>
         ${banned ? `<div class="muted">Reason: ${escapeHtml(banned.reason || "No reason")}</div>` : ""}
         <div class="admin-row-actions">
