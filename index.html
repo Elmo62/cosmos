@@ -4060,6 +4060,7 @@ function openSession() {
     aria-label="Open Cosmos menu"
     title="Open side menu"
     type="button"
+    onclick="event.preventDefault(); event.stopPropagation(); document.getElementById('panel').classList.toggle('open'); this.setAttribute('aria-expanded', document.getElementById('panel').classList.contains('open') ? 'true' : 'false');"
   >
 
     <span class="dot"></span>
