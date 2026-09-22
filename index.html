@@ -76,6 +76,14 @@
     .table { max-height:420px; overflow:auto; }
     .row { border-bottom:1px solid #1e1e1e; padding:12px 0; font-size:.8rem; }
     .row:last-child { border-bottom:0; }
+    .presence-line { margin-top:7px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+    .presence-dot { width:8px; height:8px; border-radius:50%; display:inline-block; background:#555; }
+    .presence-dot.online { background:#62d98b; }
+    .presence-online { color:#62d98b; }
+    .presence-offline { color:#777; }
+    .open-games { margin-top:8px; padding:9px 10px; background:#111; border:1px solid #222; border-radius:10px; }
+    .open-game { padding:4px 0; font-size:.75rem; }
+    .open-game + .open-game { border-top:1px solid #1e1e1e; }
     .muted { color:#666; }
     .admin-toolbar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px; }
     .admin-toolbar .small-btn.active { background:#fff; color:#000; }
@@ -100,9 +108,45 @@
     }
 
     /* Existing session popup styles are injected by openSession(). */
+  
+    #banScreen {
+      position:fixed; inset:0; z-index:999999;
+      display:none; align-items:center; justify-content:center;
+      background:#000; color:#fff; text-align:center;
+      font-family:inherit;
+    }
+    #banScreen.show { display:flex; }
+    .ban-box { width:min(700px,90vw); }
+    .ban-title {
+      color:#ff2020; font-size:clamp(4rem,12vw,9rem);
+      font-weight:900; letter-spacing:.08em; line-height:1;
+      margin:0 0 22px;
+    }
+    .ban-email { color:#888; font-size:1rem; margin-bottom:22px; }
+    .ban-reason { color:#ddd; font-size:1rem; margin:10px 0; }
+    .ban-by { color:#aaa; font-size:.9rem; margin-top:22px; }
+    .ban-appeal {
+      color:#777; font-size:.85rem; line-height:1.6;
+      margin-top:28px;
+    }
+
   </style>
 </head>
 <body>
+
+  <div id="banScreen">
+    <div class="ban-box">
+      <div class="ban-title">BANNED</div>
+      <div id="banEmail" class="ban-email">31henrdr@stu.kingsford.org</div>
+      <div id="banReason" class="ban-reason"></div>
+      <div id="banBy" class="ban-by"></div>
+      <div class="ban-appeal">
+        If you believe this ban was made in error, contact
+        <b>31henrdr@stu.kingsford.org</b> to appeal your ban.
+      </div>
+    </div>
+  </div>
+
 
   <div id="loginOverlay" class="login-overlay">
     <div class="login-card">
@@ -261,6 +305,7 @@
   let currentRole = null;
   let isAdmin = false;
   let cachedUsers = [];
+  let cachedPresence = new Map();
   let cachedBans = [];
 
   function showLoginError(message) {
@@ -291,7 +336,7 @@
   async function checkBan(userId) {
     const { data, error } = await supabaseClient
       .from("banned_users")
-      .select("reason,expires_at")
+      .select("reason,banned_by,expires_at,active")
       .eq("user_id", userId)
       .eq("active", true)
       .maybeSingle();
@@ -305,13 +350,46 @@
 
     const expired = data.expires_at && new Date(data.expires_at) <= new Date();
     if (expired) {
-      await supabaseClient.from("banned_users").update({active:false}).eq("user_id", userId);
+      await supabaseClient
+        .from("banned_users")
+        .update({ active:false })
+        .eq("user_id", userId);
       return false;
     }
 
-    await supabaseClient.auth.signOut();
-    showLoginError("This account is banned." + (data.reason ? " Reason: " + data.reason : ""));
+    await showBanScreen(data);
     return true;
+  }
+
+  async function showBanScreen(ban) {
+    const email = currentUser?.email || "";
+    document.getElementById("banEmail").textContent = email;
+    document.getElementById("banReason").textContent =
+      "Reason: " + (ban.reason || "No reason provided");
+
+    let bannedByText = "Banned by: Unknown";
+    if (ban.banned_by) {
+      const { data } = await supabaseClient
+        .from("profiles")
+        .select("email,display_name")
+        .eq("id", ban.banned_by)
+        .maybeSingle();
+
+      if (data) {
+        const name = data.display_name && data.display_name !== data.email
+          ? data.display_name + " (" + data.email + ")"
+          : (data.email || data.display_name);
+        if (name) bannedByText = "Banned by: " + name;
+      }
+    }
+
+    document.getElementById("banBy").textContent = bannedByText;
+    document.getElementById("banScreen").classList.add("show");
+
+    // Remove access from the current session. The screen stays locked.
+    await supabaseClient.auth.signOut();
+    currentUser = null;
+    isAdmin = false;
   }
 
   async function handleSession(session) {
@@ -428,6 +506,8 @@
   });
 
   async function init() {
+    document.getElementById("banScreen")?.classList.remove("show");
+
     const { data, error } = await supabaseClient.auth.getSession();
     if (error) {
       showLoginError(error.message);
@@ -541,11 +621,18 @@
         .eq("active", true),
 
       supabaseClient.from("user_roles")
-        .select("user_id,role")
+        .select("user_id,role"),
+
+      supabaseClient.from("cosmos_presence")
+        .select("user_id,session_id,tabs,active_tab,last_seen")
     ]);
 
     cachedUsers = users.data || [];
     cachedBans = bans.data || [];
+    cachedPresence = new Map();
+    for (const p of (presence.data || [])) {
+      cachedPresence.set(p.user_id, p);
+    }
 
     renderBroadcastAdmin(broadcasts.data || [], broadcasts.error);
     renderUsers(cachedUsers, users.error);
@@ -582,6 +669,18 @@
     renderUsers(cachedUsers, null);
   }
 
+  setInterval(async () => {
+    if (!isAdmin || document.getElementById("adminPanel")?.classList.contains("hidden")) return;
+    const { data, error } = await supabaseClient
+      .from("cosmos_presence")
+      .select("user_id,session_id,tabs,active_tab,last_seen");
+    if (!error) {
+      cachedPresence = new Map();
+      for (const p of (data || [])) cachedPresence.set(p.user_id, p);
+      renderCurrentUsers();
+    }
+  }, 15000);
+
   function renderBroadcastAdmin(rows, error) {
     const el = document.getElementById("adminBroadcastList");
     if (error) {
@@ -614,16 +713,45 @@
       u.id.toLowerCase().includes(q)
     );
 
+    const ONLINE_MS = 90000;
+
     el.innerHTML = filtered.map(u => {
       const banned = cachedBans.find(b => b.user_id === u.id);
       const displayName = (u.display_name || "").trim();
       const email = (u.email || "").trim();
       const showName = displayName && displayName.toLowerCase() !== email.toLowerCase();
+
+      const presence = cachedPresence.get(u.id);
+      const online = !!presence && (Date.now() - new Date(presence.last_seen).getTime() < ONLINE_MS);
+      const tabs = Array.isArray(presence?.tabs) ? presence.tabs : [];
+
+      const gamesHtml = online && tabs.length
+        ? `<div class="open-games">
+            <div class="muted" style="margin-bottom:4px">Open Cosmos tabs</div>
+            ${tabs.map((tab, i) => {
+              const name = escapeHtml(tab.name || "New Tab");
+              const url = escapeHtml(tab.url || "");
+              const active = i === Number(presence.active_tab);
+              return `<div class="open-game">${active ? "● " : "○ "}<b>${name}</b>${url ? `<div class="muted">${url}</div>` : ""}</div>`;
+            }).join("")}
+          </div>`
+        : online
+          ? `<div class="open-games muted">No game tabs open.</div>`
+          : "";
+
       return `<div class="row">
         ${showName ? `<b>${escapeHtml(displayName)}</b>` : ""}
         ${banned ? '<span class="badge">BANNED</span>' : ""}
         ${email ? `<div>${escapeHtml(email)}</div>` : ""}
         <div class="muted">${escapeHtml(u.id)}</div>
+
+        <div class="presence-line">
+          <span class="presence-dot ${online ? "online" : ""}"></span>
+          <span class="${online ? "presence-online" : "presence-offline"}">${online ? "ONLINE" : "Offline"}</span>
+          ${presence ? `<span class="muted">· last seen ${new Date(presence.last_seen).toLocaleTimeString()}</span>` : ""}
+        </div>
+
+        ${gamesHtml}
         ${banned ? `<div class="muted">Reason: ${escapeHtml(banned.reason || "No reason")}</div>` : ""}
         <div class="admin-row-actions">
           <button class="mini-action" onclick="selectModerationUser('${u.id}')">Select</button>
@@ -913,6 +1041,8 @@
       <script>
         (() => {
           let tabs=[], activeIndex=-1, fixEnabled=false;
+          const cosmosUserId = ${JSON.stringify(currentUser?.id || null)};
+          const sessionId = 'session-' + Date.now() + '-' + Math.random().toString(36).slice(2);
           const container=document.getElementById('view-container');
           const list=document.getElementById('tab-list');
           const n=document.getElementById('n');
@@ -922,6 +1052,38 @@
 
           function toggleMenu(){ panel.classList.toggle('open'); }
           ghost.addEventListener('click', toggleMenu);
+
+          async function syncPresence(){
+            try{
+              if(!window.opener || !window.opener.supabaseClient || !cosmosUserId) return;
+              const sb=window.opener.supabaseClient;
+              const cleanTabs=tabs.map(tab=>({
+                name:tab.name,
+                url:tab.url
+              }));
+              const result=await sb.from('cosmos_presence').upsert({
+                user_id:cosmosUserId,
+                session_id:sessionId,
+                tabs:cleanTabs,
+                active_tab:activeIndex,
+                last_seen:new Date().toISOString()
+              },{onConflict:'user_id,session_id'});
+              if(result.error) console.error('Presence sync failed:',result.error);
+            }catch(e){ console.error('Presence sync failed:',e); }
+          }
+
+          async function clearPresence(){
+            try{
+              if(!window.opener || !window.opener.supabaseClient || !cosmosUserId) return;
+              await window.opener.supabaseClient
+                .from('cosmos_presence')
+                .delete()
+                .eq('user_id',cosmosUserId)
+                .eq('session_id',sessionId);
+            }catch(e){}
+          }
+
+          window.addEventListener('beforeunload',()=>{ clearPresence(); });
 
           function getFriendlyName(url){
             try{
@@ -957,6 +1119,7 @@
             tabs.push({id,url:tabUrl,name:getFriendlyName(tabUrl)});
             n.value='';
             switchTab(tabs.length-1);
+            syncPresence();
           }
 
           function switchTab(index){
@@ -964,6 +1127,7 @@
             activeIndex=index;
             container.querySelectorAll('iframe').forEach((f,i)=>f.classList.toggle('active',i===index));
             renderTabs();
+            syncPresence();
           }
 
           function closeTab(index){
@@ -977,6 +1141,7 @@
             else if(activeIndex>=tabs.length) activeIndex=tabs.length-1;
             renderTabs();
             if(activeIndex!==-1) switchTab(activeIndex);
+            syncPresence();
           }
 
           function renderTabs(){
@@ -1119,12 +1284,14 @@
           document.getElementById('chatSend').addEventListener('click',sendChat);
           chatInput.addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
           document.getElementById('fixBtn').addEventListener('click',toggleFix);
-          document.getElementById('killBtn').addEventListener('click',()=>popup.close());
+          document.getElementById('killBtn').addEventListener('click',async()=>{ await clearPresence(); popup.close(); });
           n.addEventListener('keydown',e=>{if(e.key==='Enter') addTab();});
 
           loadCosmosBroadcasts();
           setInterval(loadCosmosBroadcasts,5000);
           addTab(${JSON.stringify(url)});
+          syncPresence();
+          setInterval(syncPresence,15000);
         })();
       <\/script></body></html>
     `);
