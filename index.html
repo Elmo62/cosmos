@@ -1,470 +1,416 @@
 <!DOCTYPE html>
-
 <html lang="en">
-
 <head>
-
   <meta charset="UTF-8">
-
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <title>Cosmos | Launch</title>
-
   <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap" rel="stylesheet">
-
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
+    :root { --bg:#000; --pill:#1a1a1a; --white:#fff; --muted:#777; --red:#ff5555; }
+    * { box-sizing:border-box; }
+    body { background:var(--bg); color:var(--white); font-family:'Comfortaa',cursive; display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; margin:0; overflow:hidden; }
+    .main-ui { text-align:center; }
+    h1 { font-weight:700; letter-spacing:-2px; margin-bottom:2rem; font-size:4rem; opacity:.9; }
+    .main-input { background:var(--pill); border:2px solid #222; padding:1.2rem 2.5rem; color:#fff; width:420px; outline:none; border-radius:100px; transition:.4s; text-align:center; font-size:1rem; }
+    .main-input:focus { border-color:#444; }
+    .launch-btn,.admin-btn { margin-top:2rem; background:var(--white); color:#000; border:none; padding:1.2rem 4rem; cursor:pointer; font-weight:700; border-radius:100px; transition:.3s; }
+    .launch-btn:hover,.admin-btn:hover { transform:scale(1.05); background:#eee; }
+    .account { position:fixed; top:18px; left:18px; display:flex; gap:8px; align-items:center; z-index:10; }
+    .account button,.small-btn { background:#151515; border:1px solid #252525; color:#fff; border-radius:999px; padding:10px 14px; cursor:pointer; font-family:inherit; }
+    .account button:hover,.small-btn:hover { background:#fff; color:#000; }
+    .login-overlay { position:fixed; inset:0; background:#000; display:flex; justify-content:center; align-items:center; z-index:100000; }
+    .login-card { width:min(430px,90vw); background:#0d0d0d; border:1px solid #222; border-radius:24px; padding:35px; text-align:center; }
+    .login-card h2 { margin:0 0 10px; }
+    .login-card p { color:#777; font-size:.85rem; margin-bottom:25px; }
+    .google-btn { width:100%; padding:14px; border:1px solid #333; border-radius:999px; background:#fff; color:#000; font-weight:700; cursor:pointer; font-family:inherit; }
+    .error { color:#ff6666; font-size:.8rem; min-height:20px; margin-top:12px; }
+    .hidden { display:none !important; }
 
-    :root { --bg: #000000; --pill: #1a1a1a; --white: #ffffff; }
+    /* Broadcast */
+    #broadcasts { position:fixed; bottom:18px; left:18px; width:min(380px,calc(100vw - 36px)); z-index:50; }
+    .broadcast { background:#111; border:1px solid #292929; border-radius:15px; padding:14px 16px; margin-top:8px; box-shadow:0 8px 30px #000; }
+    .broadcast small { color:#666; display:block; margin-top:6px; }
 
-    body {
-
-      background: var(--bg); color: var(--white);
-
-      font-family: 'Comfortaa', cursive;
-
-      display: flex; flex-direction: column; justify-content: center;
-
-      align-items: center; height: 100vh; margin: 0; overflow: hidden;
-
+    /* Admin */
+    #adminPanel { position:fixed; inset:0; background:#050505; z-index:200000; overflow:auto; padding:35px; }
+    .admin-wrap { max-width:1050px; margin:auto; }
+    .admin-head { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:25px; }
+    .admin-head h2 { margin:0; }
+    .admin-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .admin-card { background:#0d0d0d; border:1px solid #222; border-radius:20px; padding:20px; }
+    .admin-card h3 { margin-top:0; }
+    textarea { width:100%; min-height:130px; resize:vertical; background:#151515; border:1px solid #252525; color:#fff; border-radius:14px; padding:14px; outline:none; font-family:inherit; }
+    .admin-action { width:100%; margin-top:10px; padding:12px; border:0; border-radius:999px; cursor:pointer; font-family:inherit; font-weight:700; }
+    .table { max-height:350px; overflow:auto; }
+    .row { border-bottom:1px solid #1e1e1e; padding:11px 0; font-size:.8rem; }
+    .row:last-child { border-bottom:0; }
+    .muted { color:#666; }
+    @media(max-width:700px) {
+      h1 { font-size:3rem; }
+      .main-input { width:min(420px,85vw); }
+      .admin-grid { grid-template-columns:1fr; }
+      #adminPanel { padding:20px; }
     }
 
-    .main-ui { text-align: center; }
-
-    h1 { font-weight: 700; letter-spacing: -2px; margin-bottom: 2rem; font-size: 4rem; opacity: 0.9; }
-
-    .main-input {
-
-      background: var(--pill); border: 2px solid #222; padding: 1.2rem 2.5rem;
-
-      color: #fff; width: 420px; outline: none; border-radius: 100px;
-
-      transition: all 0.4s ease; text-align: center; font-size: 1rem;
-
-    }
-
-    .main-input:focus { border-color: #444; }
-
-    .launch-btn {
-
-      margin-top: 2rem; background: var(--white); color: #000; border: none;
-
-      padding: 1.2rem 4rem; cursor: pointer; font-weight: 700;
-
-      border-radius: 100px; transition: 0.3s;
-
-    }
-
-    .launch-btn:hover { transform: scale(1.05); background: #eee; }
-
+    /* Existing session popup styles are injected by openSession(). */
   </style>
-
 </head>
-
 <body>
 
-
-
-  <div class="main-ui">
-
-    <h1>Cosmos</h1>
-
-    <input id="pageInput" class="main-input" type="text" placeholder="destination..." spellcheck="false">
-
-    <br>
-
-    <button class="launch-btn" onclick="openSession();">Open Session</button>
-
+  <div id="loginOverlay" class="login-overlay">
+    <div class="login-card">
+      <h2>Cosmos</h2>
+      <p>Sign in with Google to use Cosmos.</p>
+      <button id="googleLogin" class="google-btn">Continue with Google</button>
+      <div id="loginError" class="error"></div>
+    </div>
   </div>
 
-
-
-  <script>
-
-    function openSession() {
-
-      const input = document.getElementById('pageInput');
-
-      let url = input.value.trim();
-
-      if (!url) { input.style.borderColor = "#f00"; return; }
-
-      if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-
-
-
-      const popup = window.open('about:blank', 'CosmosSession', 'width=1280,height=720');
-
-
-
-      popup.document.write(`
-
-        <!DOCTYPE html>
-
-        <html>
-
-        <head>
-
-          <title>Cosmos Session</title>
-
-          <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap" rel="stylesheet">
-
-          <style>
-
-            body, html { margin:0; padding:0; height:100%; overflow:hidden; background:#000; font-family:'Comfortaa', cursive; color:white; }
-
-            #view-container { width:100%; height:100%; position:relative; }
-
-            iframe { width:100%; height:100%; border:none; background:#fff; position:absolute; top:0; left:0; display:none; }
-
-            iframe.active { display:block; }
-
-            
-
-            #ghostTrigger { position:fixed; top:15px; right:15px; width:40px; height:40px; background:rgba(255,255,255,0.1); border-radius:12px; z-index:10005; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.3s; }
-
-            .dot { width:4px; height:4px; background:#fff; border-radius:50%; margin:0 1px; }
-
-
-
-            #panel { 
-
-                position:fixed; top:0; right:-400px; width:350px; height:100%; background:rgba(10,10,10,0.98); 
-
-                transition:0.5s cubic-bezier(0.16,1,0.3,1); z-index:10001; padding:25px; box-sizing:border-box; 
-
-                display:flex; flex-direction:column; backdrop-filter: blur(20px); border-left: 1px solid #222;
-
-            }
-
-            #panel.open { transform: translateX(-400px); }
-
-
-
-            #tab-list { margin: 15px 0; max-height: 400px; overflow-y: auto; }
-
-            .tab-item { 
-
-                background: #111; padding: 12px 15px; border-radius: 12px; margin-bottom: 8px; 
-
-                cursor: pointer; display: flex; justify-content: space-between; align-items: center;
-
-                font-size: 0.75rem; border: 1px solid #222; transition: 0.2s;
-
-            }
-
-            .tab-item.active { border-color: #555; background: #1a1a1a; }
-
-            .tab-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
-
-            .close-x { color: #555; font-weight: bold; padding: 0 5px; }
-
-            .close-x:hover { color: #f55; }
-
-
-
-            input { background:#151515; border:1px solid #222; color:#fff; padding:12px 20px; border-radius:100px; outline:none; width:100%; box-sizing:border-box; margin-bottom:10px; }
-
-            .btn { padding:12px; background:#1a1a1a; color:#fff; border:none; border-radius:100px; cursor:pointer; font-weight:700; width:100%; margin-bottom:10px; transition: 0.2s; }
-
-            .btn:hover { background:#fff; color:#000; }
-
-            .label { font-size:0.7rem; color:#555; text-transform:uppercase; margin:15px 0 5px 5px; letter-spacing: 1px; }
-
-          </style>
-
-        </head>
-
-        <body>
-
-          <div id="ghostTrigger" onclick="t()">
-
-            <div class="dot"></div><div class="dot"></div><div class="dot"></div>
-
-          </div>
-
-
-
-          <div id="panel">
-
-            <div style="font-weight:700; font-size:1.5rem; margin-bottom:20px;">Cosmos</div>
-
-            
-
-            <input id="n" type="text" placeholder="destination...">
-
-            <button class="btn" onclick="addTab()">+ New Tab</button>
-
-
-
-            <div class="label">Quick Links</div>
-
-            <button class="btn" onclick="addTab('https://web.cloudmoonapp.com/')">CloudMoon</button>
-
-
-
-            <div class="label">Open Tabs</div>
-
-            <div id="tab-list"></div>
-
-
-
-            <div class="label">Settings</div>
-
-            <button id="fixBtn" class="btn" onclick="toggleFix()">CloudMoon Fix: OFF</button>
-
-            
-
-            <div style="margin-top:auto;">
-
-               <button class="btn" style="background:#300; color:#f55;" onclick="window.close()">Kill Session</button>
-
-            </div>
-
-          </div>
-
-
-
-          <div id="view-container"></div>
-
-
-
-          <script>
-
-            let tabs = [];
-
-            let activeIndex = -1;
-
-            let fixEnabled = false;
-
-
-
-            const container = document.getElementById('view-container');
-
-            const list = document.getElementById('tab-list');
-
-            const n = document.getElementById('n');
-
-            const fixBtn = document.getElementById('fixBtn');
-
-
-
-            function t() { document.getElementById('panel').classList.toggle('open'); }
-
-
-
-            function getFriendlyName(url) {
-
-                try {
-
-                    let name = url.replace(/^https?:\\/\\//i, '').split('/')[0];
-
-                    if(name.includes('cloudmoon')) return "CloudMoon";
-
-                    return name.charAt(0).toUpperCase() + name.slice(1);
-
-                } catch(e) { return "New Tab"; }
-
-            }
-
-
-
-            function addTab(url = n.value) {
-
-                if(!url) return;
-
-                if(!/^https?:\\/\\//i.test(url)) url = 'https://' + url;
-
-                
-
-                const id = 'frame-' + Date.now();
-
-                const ifr = document.createElement('iframe');
-
-                ifr.id = id;
-
-                ifr.src = url;
-
-                
-
-                updateFrameSandbox(ifr);
-
-
-
-                ifr.onload = () => {
-
-                    const index = tabs.findIndex(t => t.id === id);
-
-                    if (index !== -1) {
-
-                        tabs[index].name = getFriendlyName(ifr.src);
-
-                        renderTabs();
-
-                    }
-
-                };
-
-
-
-                container.appendChild(ifr);
-
-                tabs.push({ id, url, name: getFriendlyName(url) });
-
-                n.value = '';
-
-                switchTab(tabs.length - 1);
-
-            }
-
-
-
-            function switchTab(index) {
-
-                if (index < 0) return;
-
-                activeIndex = index;
-
-                const allIframes = container.querySelectorAll('iframe');
-
-                allIframes.forEach((f, i) => {
-
-                    f.classList.toggle('active', i === index);
-
-                });
-
-                renderTabs();
-
-            }
-
-
-
-            function closeTab(e, index) {
-
-                e.stopPropagation();
-
-                const tab = tabs[index];
-
-                document.getElementById(tab.id).remove();
-
-                tabs.splice(index, 1);
-
-                
-
-                if (tabs.length === 0) {
-
-                    activeIndex = -1;
-
-                } else if (activeIndex >= index) {
-
-                    activeIndex = Math.max(0, activeIndex - 1);
-
-                }
-
-                
-
-                renderTabs();
-
-                if (activeIndex !== -1) switchTab(activeIndex);
-
-            }
-
-
-
-            function renderTabs() {
-
-                list.innerHTML = '';
-
-                tabs.forEach((tab, i) => {
-
-                    const item = document.createElement('div');
-
-                    item.className = 'tab-item' + (i === activeIndex ? ' active' : '');
-
-                    item.innerHTML = \`<span>\${tab.name}</span><div class="close-x" onclick="closeTab(event, \${i})">×</div>\`;
-
-                    item.onclick = () => switchTab(i);
-
-                    list.appendChild(item);
-
-                });
-
-            }
-
-
-
-            function updateFrameSandbox(ifr) {
-
-                if(fixEnabled) {
-
-                    ifr.setAttribute('sandbox', 'allow-forms allow-scripts allow-same-origin');
-
-                } else {
-
-                    ifr.removeAttribute('sandbox');
-
-                }
-
-            }
-
-
-
-            function toggleFix() {
-
-                fixEnabled = !fixEnabled;
-
-                fixBtn.innerText = "CloudMoon Fix: " + (fixEnabled ? "ON" : "OFF");
-
-                fixBtn.style.background = fixEnabled ? "#fff" : "#1a1a1a";
-
-                fixBtn.style.color = fixEnabled ? "#000" : "#fff";
-
-                
-
-                const allIframes = container.querySelectorAll('iframe');
-
-                allIframes.forEach(f => {
-
-                    updateFrameSandbox(f);
-
-                    const src = f.src;
-
-                    f.src = 'about:blank';
-
-                    setTimeout(() => { f.src = src; }, 50);
-
-                });
-
-            }
-
-
-
-            addTab('${url}');
-
-            n.addEventListener('keypress', (e) => { if(e.key === 'Enter') addTab(); });
-
-          <\/script>
-
-        </body>
-
-        </html>
-
-      `);
-
-      popup.document.close();
-
+  <div id="account" class="account hidden">
+    <button id="accountName"></button>
+    <button id="logoutBtn">Log out</button>
+    <button id="adminOpen" class="hidden">Admin</button>
+  </div>
+
+  <div class="main-ui">
+    <h1>Cosmos</h1>
+    <input id="pageInput" class="main-input" type="text" placeholder="destination..." spellcheck="false">
+    <br>
+    <button class="launch-btn" onclick="openSession();">Open Session</button>
+  </div>
+
+  <div id="broadcasts"></div>
+
+  <div id="adminPanel" class="hidden">
+    <div class="admin-wrap">
+      <div class="admin-head">
+        <h2>Cosmos Admin</h2>
+        <button class="small-btn" onclick="closeAdmin()">Close</button>
+      </div>
+
+      <div class="admin-grid">
+        <section class="admin-card">
+          <h3>Broadcast</h3>
+          <textarea id="broadcastText" placeholder="Message everyone..."></textarea>
+          <button class="admin-action" onclick="sendBroadcast()">Send Broadcast</button>
+          <div id="broadcastStatus" class="error"></div>
+        </section>
+
+        <section class="admin-card">
+          <h3>Recent Broadcasts</h3>
+          <div id="adminBroadcastList" class="table"></div>
+        </section>
+
+        <section class="admin-card">
+          <h3>Users</h3>
+          <div id="userList" class="table"></div>
+        </section>
+
+        <section class="admin-card">
+          <h3>Admin Logs</h3>
+          <div id="logList" class="table"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // Replace these two values with your Supabase project's values.
+  const SUPABASE_URL = "YOUR_SUPABASE_URL";
+  const SUPABASE_PUBLISHABLE_KEY = "YOUR_SUPABASE_PUBLISHABLE_KEY";
+
+  const supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY
+  );
+
+  let currentUser = null;
+  let isAdmin = false;
+
+  function showLoginError(message) {
+    document.getElementById("loginError").textContent = message || "";
+  }
+
+  async function loadRole(userId) {
+    const { data, error } = await supabaseClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error) {
+      console.error(error);
+      isAdmin = false;
+      return;
     }
 
+    isAdmin = data?.role === "admin" || data?.role === "owner";
+    document.getElementById("adminOpen").classList.toggle("hidden", !isAdmin);
+  }
 
+  async function handleSession(session) {
+    currentUser = session?.user ?? null;
 
-    document.getElementById('pageInput').addEventListener('keypress', (e) => { 
+    document.getElementById("loginOverlay").classList.toggle("hidden", !!currentUser);
+    document.getElementById("account").classList.toggle("hidden", !currentUser);
 
-        if (e.key === 'Enter') openSession(); 
+    if (!currentUser) {
+      isAdmin = false;
+      document.getElementById("adminOpen").classList.add("hidden");
+      return;
+    }
 
+    const name =
+      currentUser.user_metadata?.full_name ||
+      currentUser.user_metadata?.name ||
+      currentUser.email ||
+      "Account";
+
+    document.getElementById("accountName").textContent = name;
+    await loadRole(currentUser.id);
+    await loadBroadcasts();
+  }
+
+  document.getElementById("googleLogin").onclick = async () => {
+    showLoginError("");
+
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin
+      }
     });
 
-  </script>
+    if (error) showLoginError(error.message);
+  };
 
+  document.getElementById("logoutBtn").onclick = async () => {
+    await supabaseClient.auth.signOut();
+    location.reload();
+  };
+
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
+    // Do not perform complicated Supabase queries inside this callback.
+    setTimeout(() => handleSession(session), 0);
+  });
+
+  async function init() {
+    const { data, error } = await supabaseClient.auth.getSession();
+    if (error) {
+      showLoginError(error.message);
+      return;
+    }
+    await handleSession(data.session);
+  }
+
+  async function loadBroadcasts() {
+    const { data, error } = await supabaseClient
+      .from("broadcasts")
+      .select("id,message,created_at")
+      .eq("active", true)
+      .order("created_at", { ascending:false })
+      .limit(10);
+
+    if (error) {
+      console.error("Broadcast load failed:", error);
+      return;
+    }
+
+    const box = document.getElementById("broadcasts");
+    box.innerHTML = "";
+
+    for (const b of data || []) {
+      const el = document.createElement("div");
+      el.className = "broadcast";
+
+      const msg = document.createElement("div");
+      msg.textContent = b.message;
+
+      const time = document.createElement("small");
+      time.textContent = new Date(b.created_at).toLocaleString();
+
+      el.append(msg, time);
+      box.appendChild(el);
+    }
+  }
+
+  document.getElementById("adminOpen").onclick = async () => {
+    if (!isAdmin) return;
+    document.getElementById("adminPanel").classList.remove("hidden");
+    await refreshAdmin();
+  };
+
+  function closeAdmin() {
+    document.getElementById("adminPanel").classList.add("hidden");
+  }
+
+  async function sendBroadcast() {
+    if (!isAdmin) return;
+
+    const message = document.getElementById("broadcastText").value.trim();
+    const status = document.getElementById("broadcastStatus");
+
+    if (!message) {
+      status.textContent = "Enter a message.";
+      return;
+    }
+
+    status.textContent = "Sending...";
+
+    // RLS enforces admin access. The frontend does not grant itself permission.
+    const { error } = await supabaseClient.from("broadcasts").insert({
+      message,
+      created_by: currentUser.id,
+      active: true
+    });
+
+    if (error) {
+      status.textContent = error.message;
+      return;
+    }
+
+    document.getElementById("broadcastText").value = "";
+    status.textContent = "Broadcast sent.";
+    await loadBroadcasts();
+    await refreshAdmin();
+  }
+
+  async function refreshAdmin() {
+    if (!isAdmin) return;
+
+    const [broadcasts, users, logs] = await Promise.all([
+      supabaseClient.from("broadcasts")
+        .select("id,message,created_at,created_by,active")
+        .order("created_at", { ascending:false }).limit(50),
+
+      supabaseClient.from("profiles")
+        .select("id,email,display_name,created_at")
+        .order("created_at", { ascending:false }).limit(100),
+
+      supabaseClient.from("admin_logs")
+        .select("id,action,target_user,details,created_at")
+        .order("created_at", { ascending:false }).limit(100)
+    ]);
+
+    renderBroadcastAdmin(broadcasts.data || [], broadcasts.error);
+    renderUsers(users.data || [], users.error);
+    renderLogs(logs.data || [], logs.error);
+  }
+
+  function renderBroadcastAdmin(rows, error) {
+    const el = document.getElementById("adminBroadcastList");
+    if (error) {
+      el.textContent = error.message;
+      return;
+    }
+    el.innerHTML = rows.map(b =>
+      `<div class="row">
+        <b>${escapeHtml(b.message)}</b>
+        <div class="muted">${new Date(b.created_at).toLocaleString()}</div>
+      </div>`
+    ).join("") || '<div class="muted">No broadcasts.</div>';
+  }
+
+  function renderUsers(rows, error) {
+    const el = document.getElementById("userList");
+    if (error) {
+      el.textContent = error.message;
+      return;
+    }
+    el.innerHTML = rows.map(u =>
+      `<div class="row">
+        <b>${escapeHtml(u.display_name || "User")}</b>
+        <div>${escapeHtml(u.email || "")}</div>
+        <div class="muted">${u.id}</div>
+      </div>`
+    ).join("") || '<div class="muted">No users.</div>';
+  }
+
+  function renderLogs(rows, error) {
+    const el = document.getElementById("logList");
+    if (error) {
+      el.textContent = error.message;
+      return;
+    }
+    el.innerHTML = rows.map(l =>
+      `<div class="row">
+        <b>${escapeHtml(l.action)}</b>
+        <div class="muted">${new Date(l.created_at).toLocaleString()}</div>
+      </div>`
+    ).join("") || '<div class="muted">No logs.</div>';
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  function openSession() {
+    const input = document.getElementById('pageInput');
+    let url = input.value.trim();
+    if (!url) { input.style.borderColor = "#f00"; return; }
+    if (!/^https?:\\/\\//i.test(url)) url = 'https://' + url;
+
+    const popup = window.open('about:blank', 'CosmosSession', 'width=1280,height=720');
+    if (!popup) return;
+
+    popup.document.write(`
+      <!DOCTYPE html><html><head><title>Cosmos Session</title>
+      <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap" rel="stylesheet">
+      <style>
+        body,html{margin:0;padding:0;height:100%;overflow:hidden;background:#000;font-family:'Comfortaa',cursive;color:#fff}
+        #view-container{width:100%;height:100%;position:relative}
+        iframe{width:100%;height:100%;border:none;background:#fff;position:absolute;top:0;left:0;display:none}
+        iframe.active{display:block}
+        #ghostTrigger{position:fixed;top:15px;right:15px;width:40px;height:40px;background:rgba(255,255,255,.1);border-radius:12px;z-index:10005;cursor:pointer;display:flex;align-items:center;justify-content:center}
+        .dot{width:4px;height:4px;background:#fff;border-radius:50%;margin:0 1px}
+        #panel{position:fixed;top:0;right:-400px;width:350px;height:100%;background:rgba(10,10,10,.98);transition:.5s cubic-bezier(.16,1,.3,1);z-index:10001;padding:25px;box-sizing:border-box;display:flex;flex-direction:column;backdrop-filter:blur(20px);border-left:1px solid #222}
+        #panel.open{transform:translateX(-400px)}
+        #tab-list{margin:15px 0;max-height:400px;overflow-y:auto}
+        .tab-item{background:#111;padding:12px 15px;border-radius:12px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.75rem;border:1px solid #222}
+        .tab-item.active{border-color:#555;background:#1a1a1a}
+        .tab-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+        .close-x{color:#555;font-weight:bold;padding:0 5px}
+        input{background:#151515;border:1px solid #222;color:#fff;padding:12px 20px;border-radius:100px;outline:none;width:100%;box-sizing:border-box;margin-bottom:10px}
+        .btn{padding:12px;background:#1a1a1a;color:#fff;border:none;border-radius:100px;cursor:pointer;font-weight:700;width:100%;margin-bottom:10px}
+        .btn:hover{background:#fff;color:#000}.label{font-size:.7rem;color:#555;text-transform:uppercase;margin:15px 0 5px 5px;letter-spacing:1px}
+      </style></head><body>
+      <div id="ghostTrigger" onclick="t()"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+      <div id="panel"><div style="font-weight:700;font-size:1.5rem;margin-bottom:20px">Cosmos</div>
+      <input id="n" type="text" placeholder="destination..."><button class="btn" onclick="addTab()">+ New Tab</button>
+      <div class="label">Quick Links</div><button class="btn" onclick="addTab('https://web.cloudmoonapp.com/')">CloudMoon</button>
+      <div class="label">Open Tabs</div><div id="tab-list"></div>
+      <div class="label">Settings</div><button id="fixBtn" class="btn" onclick="toggleFix()">CloudMoon Fix: OFF</button>
+      <div style="margin-top:auto"><button class="btn" style="background:#300;color:#f55" onclick="window.close()">Kill Session</button></div></div>
+      <div id="view-container"></div>
+      <script>
+        let tabs=[],activeIndex=-1,fixEnabled=false;
+        const container=document.getElementById('view-container'),list=document.getElementById('tab-list'),n=document.getElementById('n'),fixBtn=document.getElementById('fixBtn');
+        function t(){document.getElementById('panel').classList.toggle('open')}
+        function getFriendlyName(url){try{let name=url.replace(/^https?:\\/\\//i,'').split('/')[0];if(name.includes('cloudmoon'))return'CloudMoon';return name.charAt(0).toUpperCase()+name.slice(1)}catch(e){return'New Tab'}}
+        function addTab(url=n.value){if(!url)return;if(!/^https?:\\/\\//i.test(url))url='https://'+url;const id='frame-'+Date.now();const ifr=document.createElement('iframe');ifr.id=id;ifr.src=url;updateFrameSandbox(ifr);ifr.onload=()=>{const index=tabs.findIndex(t=>t.id===id);if(index!==-1){tabs[index].name=getFriendlyName(ifr.src);renderTabs()}};container.appendChild(ifr);tabs.push({id,url,name:getFriendlyName(url)});n.value='';switchTab(tabs.length-1)}
+        function switchTab(index){if(index<0)return;activeIndex=index;container.querySelectorAll('iframe').forEach((f,i)=>f.classList.toggle('active',i===index));renderTabs()}
+        function closeTab(e,index){e.stopPropagation();const tab=tabs[index];document.getElementById(tab.id).remove();tabs.splice(index,1);if(tabs.length===0)activeIndex=-1;else if(activeIndex>=index)activeIndex=Math.max(0,activeIndex-1);renderTabs();if(activeIndex!==-1)switchTab(activeIndex)}
+        function renderTabs(){list.innerHTML='';tabs.forEach((tab,i)=>{const item=document.createElement('div');item.className='tab-item'+(i===activeIndex?' active':'');item.innerHTML='<span>'+tab.name+'</span><div class="close-x" onclick="closeTab(event,'+i+')">×</div>';item.onclick=()=>switchTab(i);list.appendChild(item)})}
+        function updateFrameSandbox(ifr){if(fixEnabled)ifr.setAttribute('sandbox','allow-forms allow-scripts allow-same-origin');else ifr.removeAttribute('sandbox')}
+        function toggleFix(){fixEnabled=!fixEnabled;fixBtn.innerText='CloudMoon Fix: '+(fixEnabled?'ON':'OFF');fixBtn.style.background=fixEnabled?'#fff':'#1a1a1a';fixBtn.style.color=fixEnabled?'#000':'#fff';container.querySelectorAll('iframe').forEach(f=>{updateFrameSandbox(f);const src=f.src;f.src='about:blank';setTimeout(()=>{f.src=src},50)})}
+        addTab(${JSON.stringify(url)});
+        n.addEventListener('keypress',e=>{if(e.key==='Enter')addTab()});
+      <\/script></body></html>
+    `);
+    popup.document.close();
+  }
+
+  document.getElementById('pageInput').addEventListener('keypress', e => {
+    if (e.key === 'Enter') openSession();
+  });
+
+  init();
+</script>
 </body>
-
-</html> 
-
+</html>
