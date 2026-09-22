@@ -23,7 +23,32 @@
     .login-card { width:min(430px,90vw); background:#0d0d0d; border:1px solid #222; border-radius:24px; padding:35px; text-align:center; }
     .login-card h2 { margin:0 0 10px; }
     .login-card p { color:#777; font-size:.85rem; margin-bottom:25px; }
-    .google-btn { width:100%; padding:14px; border:1px solid #333; border-radius:999px; background:#fff; color:#000; font-weight:700; cursor:pointer; font-family:inherit; }
+    .auth-input {
+      width:100%;
+      padding:14px 16px;
+      margin-top:10px;
+      border:1px solid #333;
+      border-radius:14px;
+      background:#111;
+      color:#fff;
+      outline:none;
+      font-family:inherit;
+      font-size:.9rem;
+    }
+    .auth-input:focus { border-color:#555; }
+    .auth-buttons { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+    .auth-btn {
+      width:100%;
+      padding:14px;
+      border:1px solid #333;
+      border-radius:999px;
+      font-weight:700;
+      cursor:pointer;
+      font-family:inherit;
+    }
+    .auth-btn.primary { background:#fff; color:#000; }
+    .auth-btn.secondary { background:#171717; color:#fff; }
+    .auth-btn:disabled { opacity:.5; cursor:not-allowed; }
     .error { color:#ff6666; font-size:.8rem; min-height:20px; margin-top:12px; }
     .hidden { display:none !important; }
 
@@ -61,8 +86,19 @@
   <div id="loginOverlay" class="login-overlay">
     <div class="login-card">
       <h2>Cosmos</h2>
-      <p>Sign in with Google to use Cosmos.</p>
-      <button id="googleLogin" class="google-btn">Continue with Google</button>
+      <p>Use your Kingsford student email to continue.</p>
+
+      <input id="authEmail" class="auth-input" type="email"
+             placeholder="you@stu.kingsford.org" autocomplete="email">
+
+      <input id="authPassword" class="auth-input" type="password"
+             placeholder="Password" autocomplete="current-password">
+
+      <div class="auth-buttons">
+        <button id="loginBtn" class="auth-btn primary">Log In</button>
+        <button id="signupBtn" class="auth-btn secondary">Create Account</button>
+      </div>
+
       <div id="loginError" class="error"></div>
     </div>
   </div>
@@ -127,7 +163,6 @@
 
   console.log("Cosmos: Supabase client initialized");
 
-
   let currentUser = null;
   let isAdmin = false;
 
@@ -175,37 +210,82 @@
     await loadBroadcasts();
   }
 
-  // Google login
-  const googleLoginButton = document.getElementById("googleLogin");
+  const SCHOOL_DOMAIN = "@stu.kingsford.org";
 
-  googleLoginButton.addEventListener("click", async () => {
-    showLoginError("");
-    googleLoginButton.disabled = true;
-    googleLoginButton.textContent = "Connecting...";
+  function getAuthCredentials() {
+    const email = document.getElementById("authEmail").value.trim().toLowerCase();
+    const password = document.getElementById("authPassword").value;
 
-    try {
-      const { data, error } = await supabaseClient.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: "https://elmo62.github.io/cosmos/"
-        }
-      });
-
-      console.log("Google OAuth response:", data);
-
-      if (error) {
-        console.error("Google OAuth error:", error);
-        showLoginError(error.message);
-        googleLoginButton.disabled = false;
-        googleLoginButton.textContent = "Continue with Google";
-      }
-    } catch (err) {
-      console.error("Google OAuth exception:", err);
-      showLoginError(err?.message || String(err));
-      googleLoginButton.disabled = false;
-      googleLoginButton.textContent = "Continue with Google";
+    if (!email) {
+      showLoginError("Enter your school email.");
+      return null;
     }
-  });
+
+    if (!email.endsWith(SCHOOL_DOMAIN)) {
+      showLoginError("Use your @stu.kingsford.org school email.");
+      return null;
+    }
+
+    if (!password) {
+      showLoginError("Enter your password.");
+      return null;
+    }
+
+    return { email, password };
+  }
+
+  async function setAuthButtonsDisabled(disabled) {
+    document.getElementById("loginBtn").disabled = disabled;
+    document.getElementById("signupBtn").disabled = disabled;
+  }
+
+  document.getElementById("loginBtn").onclick = async () => {
+    showLoginError("");
+    const credentials = getAuthCredentials();
+    if (!credentials) return;
+
+    await setAuthButtonsDisabled(true);
+
+    const { error } = await supabaseClient.auth.signInWithPassword(credentials);
+
+    if (error) {
+      showLoginError(error.message);
+      await setAuthButtonsDisabled(false);
+    }
+  };
+
+  document.getElementById("signupBtn").onclick = async () => {
+    showLoginError("");
+    const credentials = getAuthCredentials();
+    if (!credentials) return;
+
+    if (credentials.password.length < 6) {
+      showLoginError("Password must be at least 6 characters.");
+      return;
+    }
+
+    await setAuthButtonsDisabled(true);
+
+    const { data, error } = await supabaseClient.auth.signUp({
+      email: credentials.email,
+      password: credentials.password
+    });
+
+    if (error) {
+      showLoginError(error.message);
+      await setAuthButtonsDisabled(false);
+      return;
+    }
+
+    // With email confirmation disabled in Supabase, a session is returned
+    // and the user is logged in immediately.
+    if (data.session) {
+      await handleSession(data.session);
+    } else {
+      showLoginError("Account created, but Supabase is requiring email confirmation. Turn off Confirm email in Supabase Auth settings.");
+      await setAuthButtonsDisabled(false);
+    }
+  };
 
   document.getElementById("logoutBtn").onclick = async () => {
     await supabaseClient.auth.signOut();
