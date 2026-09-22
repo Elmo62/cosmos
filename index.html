@@ -881,9 +881,9 @@
           </p>
 
           <input
-            id="deleteUserId"
+            id="deleteUserEmail"
             class="admin-field"
-            placeholder="User ID to permanently delete"
+            placeholder="Email of account to permanently delete"
           >
 
           <button
@@ -2997,29 +2997,42 @@
 
     if (!["owner", "admin"].includes(currentRole)) return;
 
-    const userId = document.getElementById("deleteUserId").value.trim();
+    const emailInput = document.getElementById("deleteUserEmail");
     const status = document.getElementById("accountToolsStatus");
+    const email = emailInput.value.trim().toLowerCase();
 
-    if (!userId) {
-      status.textContent = "Enter a user ID.";
+    if (!email) {
+      status.textContent = "Enter the account email.";
       return;
     }
 
-    if (userId === currentUser?.id) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      status.textContent = "Enter a valid email address.";
+      return;
+    }
+
+    const user = cachedUsers.find(
+      u => (u.email || "").trim().toLowerCase() === email
+    );
+
+    if (!user) {
+      status.textContent = "No account was found with that email.";
+      return;
+    }
+
+    if (user.id === currentUser?.id) {
       status.textContent = "You cannot delete your own account from the admin panel.";
       return;
     }
 
-    const user = cachedUsers.find(u => u.id === userId);
-    const label = user?.email || user?.display_name || userId;
-    if (!confirm(`PERMANENTLY delete ${label}? This cannot be undone.`)) return;
+    if (!confirm(`PERMANENTLY delete ${user.email}? This cannot be undone.`)) return;
 
     status.textContent = "Deleting account...";
 
     try {
       const { data, error } = await supabaseClient.functions.invoke(
         "delete-user",
-        { body: { user_id: userId } }
+        { body: { email: user.email } }
       );
 
       if (error) throw error;
@@ -3027,17 +3040,16 @@
 
       await writeClientLog(
         "delete_user",
-        userId,
-        "Account permanently deleted through delete-user Edge Function"
+        user.id,
+        `Account permanently deleted through delete-user Edge Function (${user.email})`
       );
 
       status.textContent = "Account permanently deleted.";
-      document.getElementById("deleteUserId").value = "";
+      emailInput.value = "";
       await refreshAdmin();
     } catch (error) {
       console.error("Account deletion failed:", error);
-      status.textContent =
-        "Delete failed. Deploy the included delete-user Edge Function and verify its service-role secret.";
+      status.textContent = error?.message || "Account deletion failed.";
     }
   }
 
