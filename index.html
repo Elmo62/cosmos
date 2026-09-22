@@ -125,6 +125,9 @@
     SUPABASE_PUBLISHABLE_KEY
   );
 
+  console.log("Cosmos: Supabase client initialized");
+
+
   let currentUser = null;
   let isAdmin = false;
 
@@ -172,18 +175,37 @@
     await loadBroadcasts();
   }
 
-  document.getElementById("googleLogin").onclick = async () => {
+  // Google login
+  const googleLoginButton = document.getElementById("googleLogin");
+
+  googleLoginButton.addEventListener("click", async () => {
     showLoginError("");
+    googleLoginButton.disabled = true;
+    googleLoginButton.textContent = "Connecting...";
 
-    const { error } = await supabaseClient.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: "https://elmo62.github.io/cosmos/"
+    try {
+      const { data, error } = await supabaseClient.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: "https://elmo62.github.io/cosmos/"
+        }
+      });
+
+      console.log("Google OAuth response:", data);
+
+      if (error) {
+        console.error("Google OAuth error:", error);
+        showLoginError(error.message);
+        googleLoginButton.disabled = false;
+        googleLoginButton.textContent = "Continue with Google";
       }
-    });
-
-    if (error) showLoginError(error.message);
-  };
+    } catch (err) {
+      console.error("Google OAuth exception:", err);
+      showLoginError(err?.message || String(err));
+      googleLoginButton.disabled = false;
+      googleLoginButton.textContent = "Continue with Google";
+    }
+  });
 
   document.getElementById("logoutBtn").onclick = async () => {
     await supabaseClient.auth.signOut();
