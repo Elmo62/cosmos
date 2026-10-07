@@ -51,23 +51,6 @@
     &lt;/iframe&gt;
 &lt;/div&gt;</pre>
     </div>
-
-    <button class="copy-btn" id="copyBtn">Copy Code</button>
-  </div>
-
-  <script>
-    document.getElementById('copyBtn').addEventListener('click', function () {
-      const btn = this;
-      const text = document.getElementById('code').innerText;
-      const done = () => { btn.innerText = 'Copied!'; setTimeout(() => btn.innerText = 'Copy Code', 1500); };
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(done).catch(() => {});
-      } else {
-        const ta = document.createElement('textarea');
-        ta.value = text; document.body.appendChild(ta); ta.select();
-        document.execCommand('copy'); ta.remove(); done();
-      }
-    });
   </script>
 </body>
 </html>
